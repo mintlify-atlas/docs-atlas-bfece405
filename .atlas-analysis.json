@@ -1,0 +1,106 @@
+{
+  "projectType": "saas",
+  "projectName": "Pycasas - Módulo de Alquileres",
+  "projectDescription": "A web-based rental management system for SMEs that handles inventory, rental checkout/returns, invoicing, reports, and role-based user access.",
+  "theme": "almond",
+  "primaryColor": "#0066cc",
+  "lightColor": "#e8f0fe",
+  "darkColor": "#003d7a",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Getting Started",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Setup",
+            "pages": ["setup/deployment", "setup/environment", "setup/mongodb"]
+          }
+        ]
+      },
+      {
+        "tab": "User Guide",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": ["guide/login", "guide/registration", "guide/roles-permissions"]
+          },
+          {
+            "group": "Inventory",
+            "pages": ["guide/inventory-overview", "guide/add-product", "guide/edit-product", "guide/delete-product"]
+          },
+          {
+            "group": "Rentals",
+            "pages": ["guide/rental-checkout", "guide/rental-return", "guide/invoices-remissions"]
+          },
+          {
+            "group": "Reports",
+            "pages": ["guide/reports", "guide/export-csv"]
+          }
+        ]
+      },
+      {
+        "tab": "Administration",
+        "groups": [
+          {
+            "group": "User Management",
+            "pages": ["admin/manage-users", "admin/approve-reject-users"]
+          },
+          {
+            "group": "Data Sync",
+            "pages": ["admin/mongodb-sync", "admin/test-mode"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": ["api/auth-login", "api/auth-register", "api/auth-approve", "api/auth-reject"]
+          },
+          {
+            "group": "Products",
+            "pages": ["api/products-list"]
+          },
+          {
+            "group": "Rentals",
+            "pages": ["api/rentals-list"]
+          },
+          {
+            "group": "Data",
+            "pages": ["api/export-data", "api/health"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Role-based access control with four roles: Admin, Gerente, Vendedor, Bodeguero",
+    "Full inventory management (add, edit, delete, visualize products with stock alerts)",
+    "Rental lifecycle management: checkout with stock deduction and return with billing",
+    "Automatic document generation: remission notes (REM#####) and invoices (FVPA#####)",
+    "MongoDB Atlas synchronization with localStorage as offline-capable data layer",
+    "User registration with admin email approval workflow via Nodemailer",
+    "Inventory reports with KPIs, category breakdown, stock alerts, and top-5 by value",
+    "CSV export of complete rental and return history",
+    "Test/demo mode with isolated data storage to prevent production data contamination",
+    "Deployment on Vercel with Express.js backend"
+  ],
+  "publicApiSurface": [
+    "GET /api/health — MongoDB connection status check",
+    "GET /api/productos — List all products (supports ?test=true)",
+    "GET /api/alquileres — List all rentals (supports ?test=true)",
+    "POST /api/exportar — Sync localStorage data to MongoDB Atlas",
+    "POST /api/login — Authenticate user with username, password, role",
+    "POST /api/registro — Register new user (triggers email approval flow)",
+    "GET /api/aprobar-usuario?token=... — Approve user via email token link",
+    "GET /api/rechazar-usuario?token=... — Reject user via email token link",
+    "GET /api/usuarios-pendientes — List users pending approval",
+    "POST /api/aprobar-usuario-id/:id — Approve user by MongoDB ObjectId",
+    "POST /api/rechazar-usuario-id/:id — Reject and delete user by MongoDB ObjectId"
+  ]
+}
