@@ -1,0 +1,89 @@
+---
+title: "Deleting a product"
+description: "Permanently remove a rental item from the Pycasas inventory. This action is restricted to administrators."
+---
+
+The product deletion page (`productos_eliminacion.html`) lets you permanently remove a product from the inventory. It is restricted to the `admin` role.
+
+<Warning>
+  Deletion is permanent. There is no undo, recycle bin, or soft-delete. Once a product is removed, its record is gone from `localStorage` and the change is synced to MongoDB Atlas immediately.
+</Warning>
+
+## Access
+
+Only users with the `admin` role can delete products. `initProductosEliminacion()` enforces this check:
+
+```javascript
+if (sesion.role !== "admin") {
+  mostrarAccesoDenegado("Solo el Administrador puede eliminar productos.");
+}
+```
+
+Any other role that navigates to `productos_eliminacion.html` sees the access-denied message instead of the search interface. The sidebar entry for **Eliminar Artículo** is also only rendered for `admin` sessions (`soloRol: "admin"` in `script.js:306`).
+
+## Two-step workflow
+
+Deletion follows a search-then-confirm pattern to prevent accidental removals.
+
+<Steps>
+  <Step title="Search for the product">
+    Type any part of the item's **código** or **nombre** into the search field (`buscar-input`). `buscarProductoEliminacion()` runs on every keystroke and filters `localStorage` for case-insensitive matches on either field. Results appear in a table showing Código, Nombre, Categoría, Stock (with a colored badge), Precio, and a delete button.
+  </Step>
+  <Step title="Request deletion">
+    Click the **Eliminar** button on the target row. This calls `solicitarEliminar(id, nombre)`, which stores the product's `id` in the module-level variable `_idParaEliminar` and opens the confirmation modal (`modal-confirmar`). The modal displays the product name.
+  </Step>
+  <Step title="Confirm in the modal">
+    The modal shows:
+    - The product name (populated into `#confirm-nombre`)
+    - The warning: *"Esta acción no se puede deshacer."*
+    - Two buttons: **Sí, Eliminar** and **Cancelar**
+
+    Click **Sí, Eliminar** to proceed. Click **Cancelar** to call `cerrarModal()` and dismiss without any change.
+  </Step>
+  <Step title="Product is removed">
+    `confirmarEliminar()` filters the product out of the array by `id`, writes the updated list back to `localStorage`, calls `exportarDatos()` to sync with MongoDB Atlas, and closes the modal.
+  </Step>
+</Steps>
+
+## What happens on confirmation
+
+`confirmarEliminar()` performs the following operations in sequence:
+
+```javascript
+// Remove from array
+productos = productos.filter((p) => p.id !== _idParaEliminar);
+localStorage.setItem(obtenerClaveStorage("productos"), JSON.stringify(productos));
+
+// Sync to MongoDB Atlas
+exportarDatos();
+
+// Close modal and reset UI
+cerrarModal();
+document.getElementById("buscar-input").value = "";
+document.getElementById("tabla-busqueda").innerHTML = "";
+window.scrollTo(0, 0);
+```
+
+A success banner appears at the top of the page confirming which product was deleted.
+
+## Cancelling the modal
+
+Clicking **Cancelar** in the modal calls `cerrarModal()`, which:
+
+1. Hides the modal (`modal-confirmar`).
+2. Sets `_idParaEliminar` back to `null`.
+
+The product is not affected.
+
+## Stock badge in search results
+
+The search results table shows each product's stock as a colored badge, matching the logic on the inventory overview page:
+
+| Badge color | Condition |
+|---|---|
+| Green (`badge-success`) | `p.stock > (p.stockMin \|\| 0)` |
+| Red (`badge-danger`) | `p.stock <= (p.stockMin \|\| 0)` |
+
+<Tip>
+  Before deleting a product, check whether it has active rentals. Deleting a product that is currently out on rental will not restore the stock on return and may cause inconsistencies in the rental return flow.
+</Tip>

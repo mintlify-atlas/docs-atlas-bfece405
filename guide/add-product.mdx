@@ -1,0 +1,91 @@
+---
+title: "Adding a product"
+description: "Register a new rental item in the Pycasas inventory using the product intake form."
+---
+
+The product intake page (`productos_ingreso.html`) lets you register a new rental item. It calls `initProductosIngreso()` on load, which verifies your session and confirms you have the `productos` permission before displaying the form.
+
+## Access
+
+The following roles have the `productos` permission and can add products:
+
+<CardGroup cols={2}>
+  <Card title="Admin" icon="shield">
+    Full access to all inventory operations.
+  </Card>
+  <Card title="Gerente" icon="chart-bar">
+    Can view inventory and add products, but cannot process rentals.
+  </Card>
+  <Card title="Vendedor" icon="tag">
+    Can add products alongside rental operations.
+  </Card>
+  <Card title="Bodeguero" icon="warehouse">
+    Warehouse role with full inventory write access.
+  </Card>
+</CardGroup>
+
+## Form fields
+
+Submitting the form calls `guardarProducto(event)` in `script.js:387`. The function builds a product object from the following fields:
+
+| Field | Element ID | Type | Required | Notes |
+|---|---|---|---|---|
+| `id` | — | number | Auto | Set to `Date.now()` at save time; not editable |
+| `codigo` | `codigo` | text | Yes | Unique SKU; validated for duplicates before saving |
+| `nombre` | `nombre` | text | Yes | Display name of the item |
+| `categoria` | `categoria` | select | Yes | One of the fixed category options |
+| `precio` | `precio` | number | Yes | Rental price in COP; parsed with `parseFloat` |
+| `costo` | `costo` | number | No | Purchase cost in COP; parsed with `parseFloat`, defaults to `0` if empty |
+| `stock` | `stock` | number | Yes | Initial available quantity; parsed with `parseInt` |
+| `stockMin` | `stock-min` | number | No | Minimum stock threshold; parsed with `parseInt`, defaults to `0` if empty |
+| `proveedor` | `proveedor` | text | No | Supplier name |
+| `descripcion` | `descripcion` | textarea | No | Free-text description |
+| `fechaIngreso` | — | string | Auto | Set to `new Date().toLocaleDateString("es-CO")` at save time |
+| `creadoPor` | — | string | Auto | Set to `sesion.username` at save time |
+
+### Category options
+
+The `categoria` dropdown offers these fixed values: **Andamios**, **Cerchas**, **Tacos**, **Herramientas menores**, **Herramientas mayores**, **Otro**.
+
+## How to add a product
+
+<Steps>
+  <Step title="Open the intake page">
+    Navigate to **Ingresar Artículo** from the sidebar or go directly to `productos_ingreso.html`.
+  </Step>
+  <Step title="Fill in the required fields">
+    Enter a unique **Código** (e.g., `PROD-001`), a **Nombre**, select a **Categoría**, set the **Precio alquiler**, and enter the **Cantidad Disponible para Alquiler**.
+  </Step>
+  <Step title="Fill in optional fields">
+    Optionally provide **Valor de Mercancía / Costo de Compra**, **Stock Mínimo**, **Proveedor**, and **Descripción**.
+  </Step>
+  <Step title="Save">
+    Click **Guardar Artículo**. The function validates the `codigo` for duplicates, writes the product to `localStorage`, and then calls `exportarDatos()` to sync to MongoDB Atlas.
+  </Step>
+</Steps>
+
+## Duplicate code validation
+
+Before writing to storage, `guardarProducto` checks whether any existing product shares the same `codigo`:
+
+```javascript
+if (productos.find((p) => p.codigo === producto.codigo)) {
+  mostrarAlerta(msgDiv, `Ya existe un producto con el código "${producto.codigo}".`, "error");
+  return;
+}
+```
+
+If a duplicate is found, an error banner appears above the form and the product is **not** saved. Choose a different code and resubmit.
+
+## After saving
+
+On success:
+
+1. A success banner displays `Producto "<nombre>" guardado exitosamente.`
+2. The form is reset with `form-producto.reset()`.
+3. `exportarDatos()` pushes all `localStorage` data to MongoDB Atlas.
+4. The page scrolls back to the top.
+
+<Tip>
+  After adding a product, click **Ver Inventario** to confirm it appears in the table with the correct stock badge color.
+</Tip>

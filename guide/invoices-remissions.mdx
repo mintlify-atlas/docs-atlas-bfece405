@@ -1,0 +1,124 @@
+---
+title: "Invoices and remissions"
+description: "Understand how Pycasas generates, numbers, and opens the two documents produced for every rental event."
+---
+
+Every rental in Pycasas produces two printable documents: a **remission note** issued at checkout and an **invoice** issued (or updated) at return. Both are generated automatically — you do not create them manually.
+
+## Document types
+
+<CardGroup cols={2}>
+  <Card title="Remission note" icon="file-text">
+    Serves as the physical proof of delivery. Opens at checkout via `remision_salida.html?id=<rental_id>`. Numbered with the `REM#####` format.
+  </Card>
+  <Card title="Invoice" icon="receipt">
+    The formal billing document. Opens at return via `factura_alquiler.html?id=<rental_id>`. Numbered with the `FVPA#####` format.
+  </Card>
+</CardGroup>
+
+## Document numbering
+
+Both documents for the same rental share **one consecutive number**. The number is formatted differently for each document type:
+
+```javascript
+function formatearNumeroRemision(consecutivo) {
+  return `REM${String(consecutivo).padStart(5, "0")}`;
+}
+
+function formatearNumeroFactura(consecutivo) {
+  return `FVPA${String(consecutivo).padStart(5, "0")}`;
+}
+```
+
+For example, if a rental is assigned consecutive number `1`, the remission note is `REM00001` and the invoice is `FVPA00001`.
+
+### Consecutive counter
+
+The counter is managed by `obtenerSiguienteConsecutivoDocumental(alquileres)`. It works as follows:
+
+1. Reads the last saved value from `localStorage` under the key `consecutivoDocumental`.
+2. Scans all existing rental records and resolves the highest consecutive number found in any record via `resolverConsecutivoDesdeAlquiler()`.
+3. Takes the maximum of the saved value and the data-derived maximum.
+4. Adds 1 to produce the next number.
+5. Saves the new value back to `localStorage`.
+
+```javascript
+function obtenerSiguienteConsecutivoDocumental(alquileres = []) {
+  const guardado = parseInt(
+    localStorage.getItem(obtenerClaveStorage("consecutivoDocumental")) || "-1",
+    10,
+  );
+  let maxDesdeDatos = -1;
+
+  alquileres.forEach((a) => {
+    const consecutivo = resolverConsecutivoDesdeAlquiler(a);
+    if (Number.isInteger(consecutivo) && consecutivo > maxDesdeDatos) {
+      maxDesdeDatos = consecutivo;
+    }
+  });
+
+  const siguiente = Math.max(guardado, maxDesdeDatos) + 1;
+  localStorage.setItem(obtenerClaveStorage("consecutivoDocumental"), String(siguiente));
+  return siguiente;
+}
+```
+
+This design means the counter is self-healing: even if `localStorage` is cleared and then re-imported with existing rentals, the counter will not produce duplicates because it always reads the maximum from the actual data.
+
+<Note>
+  In test mode (sessions with `isTest: true`), the counter is stored under a separate key (`consecutivoDocumental_test`), so test rentals do not consume production document numbers.
+</Note>
+
+## Remission note (`remision_salida.html`)
+
+The remission note is initialized by `initRemisionSalida()`. It reads the rental ID from the URL query parameter `?id=` and looks up the matching record in `localStorage`.
+
+The document displays:
+
+- Company header: Pycasas Alquileres, NIT 900.502.960-5, Tel 300 380 38 99
+- Remission number (`rem-numero`) and dates
+- Client name, ID, phone, address
+- Table of items: `#`, código, nombre, cantidad, precio/día, subtotal día
+- Subtotal per day
+- Deposit of guarantee received
+- Total received at checkout (equal to the guarantee amount)
+- Observations (hidden if empty)
+- Signature areas for the delivering user and the client
+
+Print the document using the **Imprimir Remisión** button, which calls `window.print()`.
+
+## Invoice (`factura_alquiler.html`)
+
+The invoice is initialized by `initFacturaAlquiler()`. It reads the same `?id=` parameter and loads the rental from `localStorage`.
+
+The document displays:
+
+- Company header and invoice number (`fact-numero`)
+- Dates: emission, checkout, and return
+- Status badge: **ACTIVO** (blue) or **DEVUELTO** (green)
+- Client name, ID, phone, address
+- Table of items with days and subtotals (shows "Pendiente" for active rentals)
+- Financial summary:
+  - Subtotal alquiler (rate × quantity per day)
+  - Valor Alquiler (rate × days, finalized at return)
+  - Garantía retenida (only shown if `garantiaCobrada` is true)
+  - Total a pagar
+- Observations (hidden if empty)
+- Signature areas
+
+Print the document using the **Imprimir Factura** button, which calls `window.print()`.
+
+<Tip>
+  The invoice can be opened at any time from the rental history table on the checkout or return pages. The **Total a pagar** line shows "Pendiente" until the rental is returned and days are calculated.
+</Tip>
+
+## Accessing documents
+
+From the **Historial de Alquileres** table on `alquiler_salida.html`, and from the **Historial de Devoluciones** table on `alquiler_devolucion.html`, each rental row contains:
+
+| Link | Destination |
+|---|---|
+| **Remisión** | `remision_salida.html?id=<rental_id>` |
+| **Factura** | `factura_alquiler.html?id=<rental_id>` |
+
+Both links open in a new browser tab.

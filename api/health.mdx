@@ -1,0 +1,68 @@
+---
+title: 'Health check'
+description: 'Verify that the server and MongoDB connection are operational.'
+---
+
+`GET /api/health`
+
+Pings the MongoDB `admin` database with a `{ ping: 1 }` command and returns the current connection status. No authentication required.
+
+## Query parameters
+
+This endpoint accepts no query parameters.
+
+## Response fields
+
+### 200 — OK
+
+<ResponseField name="ok" type="boolean">
+  `true` when MongoDB is reachable.
+</ResponseField>
+
+<ResponseField name="mongo" type="string">
+  Connection status string. Value is `"up"` on success.
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp of when the check was performed (e.g. `"2024-01-15T10:30:00.000Z"`).
+</ResponseField>
+
+### 500 — MongoDB unreachable
+
+<ResponseField name="ok" type="boolean">
+  `false` when the ping command failed.
+</ResponseField>
+
+<ResponseField name="mongo" type="string">
+  Value is `"down"`.
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message from the MongoDB driver.
+</ResponseField>
+
+## Example
+
+```bash
+curl https://your-domain.com/api/health
+```
+
+**200 response**
+
+```json
+{
+  "ok": true,
+  "mongo": "up",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+**500 response**
+
+```json
+{
+  "ok": false,
+  "mongo": "down",
+  "error": "connect ECONNREFUSED 127.0.0.1:27017"
+}
+```

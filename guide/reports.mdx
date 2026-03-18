@@ -1,0 +1,99 @@
+---
+title: "Reports"
+description: "View KPIs, category breakdowns, low-stock alerts, and a full inventory detail report from the Pycasas reports page."
+---
+
+The reports page (`reportes.html`) provides a full analytical view of the inventory. It calls `initReportes()` on load, which verifies your session and confirms you have the `reportes` permission before calling `generarReportes()`.
+
+## Access
+
+Only roles with the `reportes` permission can view this page.
+
+<CardGroup cols={2}>
+  <Card title="Admin" icon="shield">
+    Has `reportes` permission — full access.
+  </Card>
+  <Card title="Gerente" icon="chart-bar">
+    Has `reportes` permission — full access.
+  </Card>
+</CardGroup>
+
+`Vendedor` and `Bodeguero` do not have the `reportes` permission. Navigating directly to `reportes.html` with those roles shows the access-denied message from `mostrarAccesoDenegado()`.
+
+## KPI cards
+
+`generarReportes()` reads all products from `localStorage` and computes five KPI values displayed at the top of the page in `#kpis`:
+
+| KPI | Formula | Badge color |
+|---|---|---|
+| **Productos Registrados** | `productos.length` | Default |
+| **Unidades Totales** | `sum(p.stock)` | Default |
+| **Valor en Venta** | `sum(p.precio * p.stock)` | Green (`stat-success`) |
+| **Utilidad Estimada** | `valorVenta - valorCosto` where `valorCosto = sum((p.costo \|\| 0) * p.stock)` | Blue (`stat-info`) |
+| **Alertas de Stock** | Count of products where `p.stock <= (p.stockMin \|\| 0)` | Yellow (`stat-warning`) |
+
+<Note>
+  **Utilidad Estimada** is the difference between the total sale value and the total purchase cost of all stock on hand. It assumes every unit would be sold at its registered `precio`. Products without a `costo` value contribute `0` to `valorCosto`.
+</Note>
+
+## Report sections
+
+### Products by category
+
+Rendered in `#reporte-categorias`. Each category group shows:
+
+| Column | Description |
+|---|---|
+| **Categoría** | Category name as an info badge |
+| **Productos** | Count of distinct product records in that category |
+| **Unidades** | Sum of `p.stock` for that category |
+| **Valor** | Sum of `p.precio * p.stock` for that category |
+
+### Low-stock products
+
+Rendered in `#reporte-stock-bajo`. A product appears here when `p.stock <= (p.stockMin || 0)`.
+
+| Column | Notes |
+|---|---|
+| **Código** | Displayed as `<code>` |
+| **Producto** | Product name |
+| **Stock** | Current quantity — shown with a red `badge-danger` badge |
+| **Mínimo** | The `stockMin` threshold; defaults to `0` if not set |
+
+If all products have sufficient stock, the section displays a green confirmation message instead of a table.
+
+### Top 5 by inventory value
+
+Rendered in `#reporte-top`. Products are sorted by `precio * stock` in descending order and the top five are shown:
+
+| Column | Notes |
+|---|---|
+| **#** | Rank 1–5 |
+| **Producto** | Product name |
+| **Precio Unit.** | Unit rental price in COP |
+| **Stock** | Available quantity |
+| **Valor Total** | `p.precio * p.stock`, displayed in bold |
+
+### Full inventory detail
+
+Rendered in `#reporte-completo`. This table includes every product with all financial columns:
+
+| Column | Field / Formula | Notes |
+|---|---|---|
+| **Código** | `p.codigo` | Displayed as `<code>` |
+| **Nombre** | `p.nombre` | — |
+| **Cat.** | `p.categoria` | — |
+| **Precio** | `p.precio` | Rental price in COP |
+| **Costo** | `p.costo` | Purchase cost; shows `–` if not set |
+| **Stock** | `p.stock` | Green badge if above `stockMin`, red badge if at or below |
+| **Valor** | `p.precio * p.stock` | Total rental value for this product |
+| **Utilidad** | `(p.precio - (p.costo \|\| 0)) * p.stock` | Green text if positive, red text if negative |
+| **Proveedor** | `p.proveedor` | Shows `–` if not set |
+
+## Printing the report
+
+Click the **Imprimir** button in the header of the full inventory section. This calls `imprimirReporte()`, which executes `window.print()`. The page's print stylesheet hides navigation and sidebar elements so only the report content is printed.
+
+<Tip>
+  For a management summary, consider printing just the KPI section and the top-5 table. Use your browser's print preview to select specific pages if needed.
+</Tip>

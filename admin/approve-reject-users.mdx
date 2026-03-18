@@ -1,0 +1,109 @@
+---
+title: "Approving and rejecting users"
+description: "Technical reference for the two methods of approving or rejecting pending user accounts in Pycasas - Módulo de Alquileres."
+---
+
+There are two ways to approve or reject a pending user: using the **email links** generated at registration time, or using the **admin UI** after the account is listed on `admin_usuarios.html`.
+
+## Method 1: Email token links
+
+When a user registers, the server generates two random 20-byte hex tokens (`crypto.randomBytes(20).toString('hex')`) and sends links to `tecnico@pycasas.co`.
+
+### Approve via token
+
+```
+GET /api/aprobar-usuario?token=<tokenAprobacion>
+```
+
+The server finds the user by matching `tokenAprobacion` in the `usuarios` collection. If found, it:
+
+1. Sets `activo: true` and `aprobado: true`.
+2. Records `fechaAprobacion: new Date()`.
+3. Removes `tokenAprobacion` and `tokenRechazo` from the document (`$unset`).
+4. Sends a confirmation email to the user.
+5. Returns an HTML success page in the browser.
+
+### Reject via token
+
+```
+GET /api/rechazar-usuario?token=<tokenRechazo>
+```
+
+The server finds the user by matching `tokenRechazo`. If found, it:
+
+1. Captures the username and email for the notification.
+2. Calls `deleteOne` to permanently remove the document.
+3. Sends a rejection email to the user.
+4. Returns an HTML confirmation page in the browser.
+
+<Note>
+  Tokens are single-use. Once a user is approved, `tokenAprobacion` is unset, so the same link will not match again. The server returns *"Token inválido o usuario ya aprobado."* for any subsequent request with the same token.
+</Note>
+
+## Method 2: Admin UI (by ID)
+
+The admin panel at `admin_usuarios.html` uses the user's MongoDB `_id` directly, bypassing tokens entirely.
+
+### Approve by ID
+
+```
+POST /api/aprobar-usuario-id/:id
+```
+
+The server looks up the user by `_id` using `new ObjectId(id)`. If found, it applies the same update as the token-based approval:
+
+```javascript
+{ 
+  $set: { activo: true, aprobado: true, fechaAprobacion: new Date() },
+  $unset: { tokenAprobacion: "", tokenRechazo: "" }
+}
+```
+
+It then sends the approval email and returns `{ ok: true, msg: "Usuario aprobado" }`.
+
+### Reject by ID
+
+```
+POST /api/rechazar-usuario-id/:id
+```
+
+The server looks up the user by `_id`, calls `deleteOne`, sends the rejection email, and returns `{ ok: true, msg: "Usuario rechazado" }`.
+
+## What happens when a user is approved
+
+After approval (by either method), the user document in the `usuarios` collection is updated as follows:
+
+| Field | Before approval | After approval |
+|---|---|---|
+| `activo` | `false` | `true` |
+| `aprobado` | `false` | `true` |
+| `fechaAprobacion` | not set | current timestamp |
+| `tokenAprobacion` | hex string | removed |
+| `tokenRechazo` | hex string | removed |
+
+The user receives an email with:
+
+- **Subject:** `✅ Tu cuenta ha sido aprobada - Gestión PYME`
+- **Body:** Their username, assigned role, and a link to `login.html`.
+
+## What happens when a user is rejected
+
+Rejection removes the user document entirely with `deleteOne`. There is no soft delete or archive.
+
+The user receives an email with:
+
+- **Subject:** `❌ Solicitud de cuenta rechazada - Gestión PYME`
+- **Body:** Their username and a suggestion to contact the administrator if they believe this is an error.
+
+<Warning>
+  Rejection is permanent. The user record is deleted from MongoDB and cannot be recovered. If a user is rejected by mistake, they must submit a new registration request from scratch.
+</Warning>
+
+## Endpoint summary
+
+| Endpoint | Method | Trigger | Action |
+|---|---|---|---|
+| `/api/aprobar-usuario` | `GET` | Email link | Approves user by token, sends email |
+| `/api/rechazar-usuario` | `GET` | Email link | Deletes user by token, sends email |
+| `/api/aprobar-usuario-id/:id` | `POST` | Admin UI | Approves user by `_id`, sends email |
+| `/api/rechazar-usuario-id/:id` | `POST` | Admin UI | Deletes user by `_id`, sends email |

@@ -1,80 +1,143 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Deploy Pycasas and process your first rental in under 10 minutes"
 ---
 
-## Get started in three steps
+This guide walks you from a fresh clone to a running system where you register a product and complete your first rental.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+- Node.js 18 or later
+- A MongoDB Atlas account (free tier works)
+- A Gmail account for email notifications (or skip email during initial setup)
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Step 1: Clone and install
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/StewiePro/pycasasAlquileres.git
+    cd pycasasAlquileres
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+  <Step title="Create your environment file">
+    Create a `.env` file in the project root:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash .env
+    MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
+    PORT=3000
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    Replace the connection string with your MongoDB Atlas URI. See [MongoDB Setup](/setup/mongodb) for details.
+  </Step>
+</Steps>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## Step 2: Start the server
 
-### Step 3: Go live
+```bash
+node server.js
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+You should see:
 
-## Next steps
+```
+✉️ Nodemailer (SMTP Dreamhost) listo para producción
+✅ Conectado a MongoDB
+🚀 Servidor corriendo en http://localhost:3000
+```
 
-Now that you have your docs running, explore these key features:
+Open your browser at `http://localhost:3000`.
 
-<CardGroup cols={2}>
+## Step 3: Log in with the demo account
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+On the login page, use the built-in demo admin credentials:
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+| Field | Value |
+|-------|-------|
+| **Username** | `Pruebas` |
+| **Password** | `123` |
+| **Role** | `Administrador` |
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The `Pruebas` account runs in **test mode** — all data is stored separately from production data. The header turns orange to remind you. Use `Pycasas2012` / `Pycasas2012` for the production demo account.
 </Note>
+
+## Step 4: Add your first product
+
+<Steps>
+  <Step title="Open the product entry form">
+    In the left sidebar, click **Ingresar Artículo**.
+  </Step>
+  <Step title="Fill in product details">
+    Complete the form with:
+    - **Código**: A unique SKU (e.g., `ANDAM-001`)
+    - **Nombre**: Product name (e.g., `Andamio Tubular 1m`)
+    - **Categoría**: Select a category
+    - **Precio/día**: Rental price per day
+    - **Stock**: Available quantity
+    - **Stock mínimo**: Low-stock alert threshold
+  </Step>
+  <Step title="Save the product">
+    Click **Guardar Producto**. The system saves to localStorage and automatically syncs to MongoDB Atlas.
+  </Step>
+</Steps>
+
+## Step 5: Create your first rental
+
+<Steps>
+  <Step title="Open rental checkout">
+    In the sidebar, click **Salida por Alquiler**.
+  </Step>
+  <Step title="Add client information">
+    Fill in the client's name, ID number, and phone number.
+  </Step>
+  <Step title="Search and add products">
+    Use the article search box to find the product you added. Click **Agregar** and enter the quantity.
+  </Step>
+  <Step title="Set a guarantee amount (optional)">
+    Enter a guarantee amount in the **Garantía** field. This is deducted from the total at checkout.
+  </Step>
+  <Step title="Register the rental">
+    Click **Registrar Salida**. The system will:
+    - Deduct stock from inventory
+    - Assign a remission number (e.g., `REM00001`) and invoice number (e.g., `FVPA00001`)
+    - Open the remission note in a new tab
+    - Sync data to MongoDB
+  </Step>
+</Steps>
+
+## Step 6: Process a return
+
+<Steps>
+  <Step title="Open the return module">
+    Click **Devolución Alquiler** in the sidebar.
+  </Step>
+  <Step title="Search for the active rental">
+    Search by client name, ID number, or rental ID.
+  </Step>
+  <Step title="Select the rental and confirm return">
+    Click **Devolver**, verify the return date and days, apply any guarantee charge, then click **Confirmar Devolución**. The system restores stock and calculates the final billing.
+  </Step>
+</Steps>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Deploy to Vercel" icon="cloud" href="/setup/deployment">
+    Deploy your production instance to Vercel in minutes.
+  </Card>
+  <Card title="Configure environment variables" icon="gear" href="/setup/environment">
+    Configure MongoDB URI, email credentials, and port settings.
+  </Card>
+  <Card title="Manage users" icon="users" href="/admin/manage-users">
+    Set up real user accounts with role-based access.
+  </Card>
+  <Card title="View reports" icon="chart-bar" href="/guide/reports">
+    Explore inventory KPIs and category breakdowns.
+  </Card>
+</CardGroup>

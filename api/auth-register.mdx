@@ -1,0 +1,108 @@
+---
+title: 'Register user'
+description: 'Create a new user account pending administrator approval.'
+---
+
+`POST /api/registro`
+
+Creates a new user record in the `usuarios` collection with `activo: false` and `aprobado: false`. Sends an email notification to `tecnico@pycasas.co` with approve and reject links. The user cannot log in until an administrator approves the account.
+
+## Request body
+
+<ParamField body="nombre" type="string" required>
+  The user's full name.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  The user's email address. Must be unique across all accounts.
+</ParamField>
+
+<ParamField body="username" type="string" required>
+  The desired username. Must be unique across all accounts.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Plain-text password. The server hashes it with bcrypt (10 salt rounds) before storing.
+</ParamField>
+
+<ParamField body="role" type="string" required>
+  The role requested by the user (e.g. `"admin"`, `"vendedor"`).
+</ParamField>
+
+## How accounts are created
+
+When registration succeeds, the server stores the following fields on the user document:
+
+| Field | Value |
+|---|---|
+| `nombre` | Provided full name |
+| `email` | Provided email |
+| `username` | Provided username |
+| `password` | bcrypt hash (10 rounds) |
+| `role` | Requested role |
+| `activo` | `false` |
+| `aprobado` | `false` |
+| `tokenAprobacion` | 20-byte random hex string |
+| `tokenRechazo` | 20-byte random hex string |
+| `fechaRegistro` | Current UTC date |
+
+The `tokenAprobacion` and `tokenRechazo` tokens are embedded in the approval/rejection email links sent to `tecnico@pycasas.co`.
+
+## Response fields
+
+### 200 — Registered
+
+<ResponseField name="ok" type="boolean">
+  `true` when the user was created and the notification email was sent.
+</ResponseField>
+
+<ResponseField name="msg" type="string">
+  `"Usuario registrado correctamente. Se ha enviado una notificación a tecnico@pycasas.co para aprobar tu cuenta. No podrás iniciar sesión hasta que sea aprobada."`
+</ResponseField>
+
+### 400 — Validation error
+
+<ResponseField name="error" type="string">
+  One of:
+  - `"El nombre de usuario ya está en uso."` — the username already exists.
+  - `"El correo electrónico ya está registrado."` — the email already exists.
+</ResponseField>
+
+### 500 — Server error
+
+<ResponseField name="error" type="string">
+  One of:
+  - Error message from the MongoDB driver.
+  - `"Error al enviar el correo de notificación."` — user was saved but the email could not be sent.
+</ResponseField>
+
+## Example
+
+```bash
+curl -X POST https://your-domain.com/api/registro \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "María García",
+    "email": "maria@example.com",
+    "username": "maria.garcia",
+    "password": "MiClave123",
+    "role": "vendedor"
+  }'
+```
+
+**200 response**
+
+```json
+{
+  "ok": true,
+  "msg": "Usuario registrado correctamente. Se ha enviado una notificación a tecnico@pycasas.co para aprobar tu cuenta. No podrás iniciar sesión hasta que sea aprobada."
+}
+```
+
+**400 response**
+
+```json
+{
+  "error": "El nombre de usuario ya está en uso."
+}
+```

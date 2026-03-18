@@ -1,0 +1,109 @@
+---
+title: 'Environment variables'
+description: 'Configure the environment variables required to run Pycasas.'
+---
+
+Pycasas uses [`dotenv`](https://github.com/motdotla/dotenv) to load environment variables from a `.env` file at startup (`require("dotenv").config()` at the top of `server.js`).
+
+## Variables reference
+
+### `MONGODB_URI`
+
+The MongoDB connection string used by the server to connect to the database.
+
+| | |
+|---|---|
+| **Default** | `mongodb://127.0.0.1:27017` |
+| **Required in production** | Yes |
+
+In `server.js`:
+
+```javascript
+const uri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
+```
+
+### `PORT`
+
+The port the Express server listens on.
+
+| | |
+|---|---|
+| **Default** | `3000` |
+| **Required in production** | No — Vercel manages the port automatically |
+
+In `server.js`:
+
+```javascript
+const PORT = process.env.PORT || 3000;
+```
+
+## `.env` file example
+
+Create a `.env` file in the project root before starting the server locally:
+
+```bash .env
+# MongoDB connection string (local Compass or Atlas)
+MONGODB_URI=mongodb://127.0.0.1:27017
+
+# Server port
+PORT=3000
+```
+
+<Note>
+  `.env` is read only on startup. Restart the server after making changes.
+</Note>
+
+## Local vs production configuration
+
+<CodeGroup>
+
+```bash .env (local)
+# Points to a local MongoDB instance (e.g. MongoDB Compass)
+MONGODB_URI=mongodb://127.0.0.1:27017
+PORT=3000
+```
+
+```bash .env (production / Atlas)
+# Full Atlas connection string with credentials
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
+PORT=3000
+```
+
+</CodeGroup>
+
+For Vercel deployments, set these variables in **Project → Settings → Environment Variables** instead of committing a `.env` file.
+
+<Warning>
+  Never commit `.env` to version control. Add it to `.gitignore` to avoid leaking credentials.
+</Warning>
+
+## Gmail SMTP (Nodemailer)
+
+The server uses [Nodemailer](https://nodemailer.com/) to send transactional emails — new user registration requests and approval/rejection notifications. The Gmail account credentials are hard-coded in `server.js` and do not require additional environment variables:
+
+```javascript
+transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "c.pycasas@gmail.com",
+    pass: "rrivumatfjxoorey", // Gmail app password
+  },
+});
+```
+
+Emails are sent from `c.pycasas@gmail.com`. Registration approval requests are delivered to `tecnico@pycasas.co`.
+
+<Tip>
+  The password above is a Gmail **app password**, not the account's login password. App passwords are generated in Google Account → Security → 2-Step Verification → App passwords and can be revoked independently.
+</Tip>
+
+## Related
+
+<Columns cols={2}>
+  <Card title="MongoDB setup" icon="database" href="/setup/mongodb">
+    Create an Atlas cluster and build your MONGODB_URI connection string.
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/setup/deployment">
+    Run locally or deploy to Vercel.
+  </Card>
+</Columns>

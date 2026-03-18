@@ -1,0 +1,161 @@
+---
+title: 'List rentals'
+description: 'Retrieve all rental records from the alquileres collection.'
+---
+
+`GET /api/alquileres`
+
+Returns all documents from the `alquileres` collection. Use the `test` query parameter to target the test database.
+
+## Query parameters
+
+<ParamField query="test" type="string">
+  When set to `"true"`, reads from the `pycasas_test` database. Omit or set to any other value to read from `pycasas`.
+</ParamField>
+
+## Response fields
+
+### 200 — OK
+
+Returns a JSON array of rental objects.
+
+<ResponseField name="id" type="number">
+  Unique numeric identifier (Unix timestamp at creation time).
+</ResponseField>
+
+<ResponseField name="consecutivoDoc" type="number">
+  Sequential document number used to generate remission and invoice numbers.
+</ResponseField>
+
+<ResponseField name="remisionNumero" type="string">
+  Formatted remission document number (e.g. `"REM-0001"`).
+</ResponseField>
+
+<ResponseField name="facturaNumero" type="string">
+  Formatted invoice number (e.g. `"FAC-0001"`).
+</ResponseField>
+
+<ResponseField name="cliente" type="object">
+  Customer information.
+  <Expandable title="properties">
+    <ResponseField name="nombre" type="string">
+      Customer full name.
+    </ResponseField>
+    <ResponseField name="identificacion" type="string">
+      Customer ID number.
+    </ResponseField>
+    <ResponseField name="telefono" type="string">
+      Customer phone number.
+    </ResponseField>
+    <ResponseField name="direccion" type="string">
+      Customer address.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="items" type="array">
+  Array of rented product line items. Each item contains the product details and quantity at the time of rental.
+</ResponseField>
+
+<ResponseField name="dias" type="number">
+  Number of rental days. Starts at `0` and is updated on return.
+</ResponseField>
+
+<ResponseField name="garantia" type="number">
+  Security deposit amount collected at checkout.
+</ResponseField>
+
+<ResponseField name="subtotalDia" type="number">
+  Daily rental cost subtotal (sum of unit prices × quantities).
+</ResponseField>
+
+<ResponseField name="totalAlquiler" type="number">
+  Total rental cost (subtotalDia × dias). Starts at `0` and is updated on return.
+</ResponseField>
+
+<ResponseField name="totalPagar" type="number">
+  Total amount due from the customer. Initially equal to the security deposit (`garantia`).
+</ResponseField>
+
+<ResponseField name="fechaSalida" type="string">
+  Checkout date and time as a locale string (e.g. `"15/1/2024, 10:30:00 a. m."`).
+</ResponseField>
+
+<ResponseField name="fechaSalidaISO" type="string">
+  Checkout date and time in ISO 8601 format.
+</ResponseField>
+
+<ResponseField name="estado" type="string">
+  Rental status. `"activo"` when items are out; updated to another value on return.
+</ResponseField>
+
+<ResponseField name="fechaDevolucionReal" type="string | null">
+  Actual return date as a locale string. `null` until items are returned.
+</ResponseField>
+
+<ResponseField name="fechaDevolucionRealISO" type="string | null">
+  Actual return date in ISO 8601 format. `null` until items are returned.
+</ResponseField>
+
+<ResponseField name="observaciones" type="string">
+  Free-text notes recorded at checkout.
+</ResponseField>
+
+<ResponseField name="registradoPor" type="string">
+  Username of the user who created the rental record.
+</ResponseField>
+
+### 500 — Server error
+
+<ResponseField name="error" type="string">
+  Error message from the server or MongoDB driver.
+</ResponseField>
+
+## Example
+
+```bash
+# Production database
+curl https://your-domain.com/api/alquileres
+
+# Test database
+curl https://your-domain.com/api/alquileres?test=true
+```
+
+**200 response**
+
+```json
+[
+  {
+    "id": 1705312200000,
+    "consecutivoDoc": 1,
+    "remisionNumero": "REM-0001",
+    "facturaNumero": "FAC-0001",
+    "cliente": {
+      "nombre": "Juan Pérez",
+      "identificacion": "123456789",
+      "telefono": "3001234567",
+      "direccion": "Calle 10 # 5-20"
+    },
+    "items": [
+      {
+        "productoId": 1705310000000,
+        "nombre": "Silla plegable",
+        "cantidad": 10,
+        "precioAlquiler": 5000
+      }
+    ],
+    "dias": 0,
+    "garantia": 50000,
+    "subtotalDia": 50000,
+    "totalAlquiler": 0,
+    "totalPagar": 50000,
+    "fechaSalida": "15/1/2024, 10:30:00 a. m.",
+    "fechaSalidaISO": "2024-01-15T15:30:00.000Z",
+    "estado": "activo",
+    "fechaDevolucionReal": null,
+    "fechaDevolucionRealISO": null,
+    "observaciones": "Cliente recogió en bodega",
+    "registradoPor": "admin"
+  }
+]
+```

@@ -1,0 +1,86 @@
+---
+title: "Roles and permissions"
+description: "The four roles in Pycasas - Módulo de Alquileres, what each permission unlocks, and which menu items are visible per role."
+---
+
+Pycasas uses a role-based access control model. Each user is assigned exactly one role at registration. The role determines which permissions the user has and which pages and menu items they can access.
+
+Permissions are assigned from the `PERMISOS_POR_ROL` map in `script.js` and stored in the session object as a `permisos` array at login time.
+
+## Roles overview
+
+<Columns cols={2}>
+  <Card title="Admin" icon="shield">
+    Full access to all features. The only role that can delete products and manage users.
+  </Card>
+  <Card title="Gerente" icon="chart-bar">
+    Read-oriented access. Can view inventory and reports but cannot process rentals or manage users.
+  </Card>
+  <Card title="Vendedor" icon="tag">
+    Operational rental access. Can process rental checkouts and returns and view products.
+  </Card>
+  <Card title="Bodeguero" icon="warehouse">
+    Warehouse access. Can manage inventory and view products but cannot process billing.
+  </Card>
+</Columns>
+
+## Permission assignments
+
+The table below shows which permissions each role receives. Permissions are defined in `PERMISOS_POR_ROL` in `script.js:13`.
+
+| Permission | Admin | Gerente | Vendedor | Bodeguero |
+|---|:---:|:---:|:---:|:---:|
+| `productos` | ✓ | ✓ | ✓ | ✓ |
+| `inventario` | ✓ | ✓ | | ✓ |
+| `facturacion` | ✓ | | ✓ | |
+| `reportes` | ✓ | ✓ | | |
+| `usuarios` | ✓ | | | |
+
+## What each permission unlocks
+
+| Permission | Features unlocked |
+|---|---|
+| `productos` | View inventory (`productos_visualizacion.html`), add products (`productos_ingreso.html`), edit products (`productos_edicion.html`) |
+| `inventario` | Inventory management access (checked alongside `productos` for stock operations) |
+| `facturacion` | Rental checkout (`alquiler_salida.html`), rental return (`alquiler_devolucion.html`) |
+| `reportes` | Reports page (`reportes.html`) with KPIs, category breakdowns, low-stock alerts, and top products |
+| `usuarios` | User registration page (`registro.html`), user management panel (`admin_usuarios.html`) |
+
+## Sidebar menu items by role
+
+The sidebar is generated dynamically in `initIndex()` in `script.js:285`. Each menu item is only rendered if `tieneAcceso(item, sesion)` returns `true` for the current session.
+
+Items can require either a `permiso` (present in the `permisos` array) or a specific `soloRol` value (exact role match).
+
+| Menu item | Page | Visible to |
+|---|---|---|
+| Inicio | `index.html` | All roles (always shown) |
+| Ver Inventario | `productos_visualizacion.html` | Roles with `productos` |
+| Ingresar Artículo | `productos_ingreso.html` | Roles with `productos` |
+| Editar Artículo | `productos_edicion.html` | Roles with `productos` |
+| Eliminar Artículo | `productos_eliminacion.html` | `admin` only |
+| Salida por Alquiler | `alquiler_salida.html` | Roles with `facturacion` |
+| Devolución Alquiler | `alquiler_devolucion.html` | Roles with `facturacion` |
+| Reportes | `reportes.html` | Roles with `reportes` |
+| Registrar Usuario | `registro.html` | `admin` only |
+| Gestionar Usuarios | `admin_usuarios.html` | `admin` only |
+
+## Admin-only restrictions
+
+<Warning>
+  The following actions are restricted to the `admin` role regardless of permissions. Accessing them with any other role displays an "Acceso Denegado" error.
+</Warning>
+
+- **Eliminar Artículo** (`productos_eliminacion.html`) — checked with `sesion.role !== "admin"` in `initProductosEliminacion()` (`script.js:565`).
+- **Registrar Usuario** (`registro.html`) — sidebar item uses `soloRol: "admin"` (`script.js:322`).
+- **Gestionar Usuarios** (`admin_usuarios.html`) — sidebar item uses `soloRol: "admin"` (`script.js:323`).
+
+## Access denied behavior
+
+If a user navigates directly to a page they do not have permission for, `mostrarAccesoDenegado()` replaces the page's `<main>` content with an error message and a link back to `index.html`. The user is not redirected — they stay on the URL but see only the denial message.
+
+```
+🚫 Acceso Denegado
+No tienes permiso para acceder a esta sección.
+[Volver al inicio]
+```

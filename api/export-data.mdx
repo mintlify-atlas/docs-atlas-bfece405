@@ -1,0 +1,93 @@
+---
+title: 'Export data to MongoDB'
+description: 'Replace the productos and alquileres collections entirely with data from the frontend.'
+---
+
+`POST /api/exportar`
+
+Replaces the `productos` and `alquileres` collections in MongoDB with the arrays provided in the request body. Each collection is fully cleared before new data is inserted.
+
+<Warning>
+  This is a **destructive replace** operation. All existing documents in both collections are deleted before new ones are inserted. There is no rollback or transaction support — this is intentional for compatibility with local MongoDB instances that do not run as a replica set.
+</Warning>
+
+## Request body
+
+<ParamField body="productos" type="array" required>
+  Array of product objects to insert into the `productos` collection. If empty, only `deleteMany` runs — no `insertMany` call is made.
+</ParamField>
+
+<ParamField body="alquileres" type="array" required>
+  Array of rental objects to insert into the `alquileres` collection. If empty, only `deleteMany` runs — no `insertMany` call is made.
+</ParamField>
+
+<ParamField body="isTest" type="boolean">
+  When `true`, writes to the `pycasas_test` database. When `false` or omitted, writes to `pycasas`. Defaults to `false`.
+</ParamField>
+
+## Response fields
+
+### 200 — OK
+
+<ResponseField name="ok" type="boolean">
+  `true` when the operation completed without errors.
+</ResponseField>
+
+<ResponseField name="msg" type="string">
+  Confirmation message: `"Datos exportados a MongoDB Atlas"`.
+</ResponseField>
+
+### 500 — Server error
+
+<ResponseField name="ok" type="boolean">
+  `false` when the operation failed.
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message from the server or MongoDB driver.
+</ResponseField>
+
+## Example
+
+```bash
+curl -X POST https://your-domain.com/api/exportar \
+  -H "Content-Type: application/json" \
+  -d '{
+    "productos": [
+      {
+        "id": 1705312200000,
+        "codigo": "SIL-001",
+        "nombre": "Silla plegable",
+        "categoria": "Mobiliario",
+        "precio": 5000,
+        "costo": 2000,
+        "stock": 50,
+        "stockMin": 5,
+        "proveedor": "Proveedor ABC",
+        "descripcion": "Silla plástica plegable",
+        "fechaIngreso": "15/1/2024",
+        "creadoPor": "admin"
+      }
+    ],
+    "alquileres": [],
+    "isTest": false
+  }'
+```
+
+**200 response**
+
+```json
+{
+  "ok": true,
+  "msg": "Datos exportados a MongoDB Atlas"
+}
+```
+
+**500 response**
+
+```json
+{
+  "ok": false,
+  "error": "MongoServerError: Document failed validation"
+}
+```

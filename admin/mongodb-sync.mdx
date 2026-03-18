@@ -1,0 +1,131 @@
+---
+title: "MongoDB data sync"
+description: "How Pycasas - Módulo de Alquileres synchronizes data between browser localStorage and MongoDB Atlas."
+---
+
+Pycasas uses the browser's `localStorage` as its primary data store, which makes the application work without a persistent network connection. MongoDB Atlas is the cloud backup and sync target. Data flows in both directions on demand.
+
+## Architecture overview
+
+| Layer | Role |
+|---|---|
+| `localStorage` | Primary store — products and rentals read and written here on every operation |
+| MongoDB Atlas | Cloud backup — used for sync, cross-device access, and persistence |
+
+The sync status and last sync time are visible in the **Información del Sistema** table on the main dashboard (`index.html`).
+
+## Dashboard sync controls
+
+Three buttons appear in the dashboard under **Acciones**:
+
+<CardGroup cols={3}>
+  <Card title="Sincronizar con Mongo" icon="upload">
+    Calls `exportarDatos()`. Pushes all data from `localStorage` to MongoDB Atlas via `POST /api/exportar`.
+  </Card>
+  <Card title="Cargar desde Mongo" icon="download">
+    Calls `cargarDatosDesdeMongo()`. Pulls data from MongoDB into `localStorage` via `GET /api/productos` and `GET /api/alquileres`.
+  </Card>
+  <Card title="Probar conexion" icon="activity">
+    Calls `verificarConexionMongo()`. Pings the server via `GET /api/health` and updates the status badge.
+  </Card>
+</CardGroup>
+
+## Pushing data to MongoDB (`POST /api/exportar`)
+
+The `exportarDatos()` function reads `productos` and `alquileres` from `localStorage` (using the correct keys for the current session mode) and sends them to the server:
+
+```javascript
+POST /api/exportar
+Content-Type: application/json
+
+{
+  "productos": [ /* array from localStorage */ ],
+  "alquileres": [ /* array from localStorage */ ],
+  "isTest": false
+}
+```
+
+On the server, `POST /api/exportar` **replaces the collections entirely**. It calls `deleteMany({})` then `insertMany(documents)` for both `productos` and `alquileres`. This is not an incremental update — the entire dataset is overwritten each time.
+
+```javascript
+await db.collection("productos").deleteMany({});
+if (productos.length > 0) {
+  await db.collection("productos").insertMany(productos);
+}
+
+await db.collection("alquileres").deleteMany({});
+if (alquileres.length > 0) {
+  await db.collection("alquileres").insertMany(alquileres);
+}
+```
+
+<Warning>
+  Because `POST /api/exportar` replaces collections entirely, any data in MongoDB that is not present in `localStorage` at the time of the sync will be lost. Always treat `localStorage` as the authoritative source before pushing.
+</Warning>
+
+## Pulling data from MongoDB
+
+The `cargarDatosDesdeMongo()` function fetches from two endpoints and overwrites the corresponding `localStorage` keys:
+
+```javascript
+GET /api/productos?test=<true|false>
+GET /api/alquileres?test=<true|false>
+```
+
+The `test` query parameter is set from `obtenerSesion()?.isTest`. If the session is in test mode, data is read from `pycasas_test`; otherwise from `pycasas`.
+
+If the `alquileres` array returned from MongoDB is empty, `cargarDatosDesdeMongo()` also removes the `consecutivoDocumental` key from `localStorage`, which resets the invoice/remission counter to zero.
+
+## Connection check (`GET /api/health`)
+
+The `verificarConexionMongo()` function calls `GET /api/health`. The server pings the MongoDB admin database and responds:
+
+```json
+{ "ok": true, "mongo": "up", "timestamp": "2024-05-20T14:32:00.000Z" }
+```
+
+The **Mongo** badge on the dashboard transitions through these states:
+
+| State | Badge text | Badge color |
+|---|---|---|
+| Checking on page load | `Verificando...` | Yellow |
+| Connection successful | `Conectado` | Green |
+| Sync successful | `Sincronizado` | Green |
+| Data loaded | `Datos cargados` | Green |
+| Connection failed | `Sin conexion` | Red |
+| Sync error | `Error de sincronizacion` | Red |
+
+## Last sync timestamp
+
+After a successful push or pull, `actualizarUltimaSincronizacion()` writes the current timestamp to `localStorage` under the key `mongoUltimaSync` as an ISO string. The dashboard displays it in two formats:
+
+- Absolute: `dd/mm/yyyy, hh:mm:ss`
+- Relative: `(hace X min)` — updated every 60 seconds without a page reload.
+
+## Test mode and database isolation
+
+When the session has `isTest: true`, all sync operations target the `pycasas_test` database instead of `pycasas`:
+
+| Operation | Production DB | Test DB |
+|---|---|---|
+| `POST /api/exportar` (`isTest: false`) | `pycasas` | — |
+| `POST /api/exportar` (`isTest: true`) | — | `pycasas_test` |
+| `GET /api/productos?test=false` | `pycasas` | — |
+| `GET /api/productos?test=true` | — | `pycasas_test` |
+| `GET /api/alquileres?test=false` | `pycasas` | — |
+| `GET /api/alquileres?test=true` | — | `pycasas_test` |
+
+See [Test mode](/admin/test-mode) for more about data isolation in test sessions.
+
+## When to sync
+
+<Tip>
+  Sync manually in these situations:
+
+  - After a bulk import of products, to persist the data to MongoDB before other users access it.
+  - Before running reports that need to reflect the latest data from another device.
+  - After processing a batch of rental returns, to ensure the returns are backed up.
+  - When switching devices — use **Cargar desde Mongo** on the new device to pull the latest state.
+</Tip>
+
+Note that `exportarDatos()` is also called automatically after every product save, edit, deletion, rental checkout, and rental return. You do not need to click **Sincronizar con Mongo** after individual operations unless you want to confirm the sync status.

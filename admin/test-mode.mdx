@@ -1,0 +1,126 @@
+---
+title: "Test mode"
+description: "How to activate and use test mode in Pycasas - Módulo de Alquileres to safely train staff or demonstrate the system."
+---
+
+Test mode provides a fully isolated environment that shares the same application interface but writes to separate storage keys and a separate MongoDB database. You can use it to train staff, explore features, or demonstrate the system without affecting production data.
+
+## Activating test mode
+
+Log in with the built-in demo account:
+
+| Field | Value |
+|---|---|
+| **Usuario** | `Pruebas` |
+| **Contraseña** | `123` |
+| **Rol** | `Administrador` (`admin`) |
+
+This account is defined in `USUARIOS_DEMO` in `script.js` with `isTest: true`. It does not exist in MongoDB and requires no network connection to authenticate.
+
+<Steps>
+  <Step title="Open the login page">
+    Navigate to `login.html`. If you already have an active session, you will be redirected to the dashboard automatically — log out first.
+  </Step>
+  <Step title="Enter the test credentials">
+    Enter `Pruebas` as the username, `123` as the password, and select **Administrador** as the role.
+  </Step>
+  <Step title="Click Iniciar Sesión">
+    The session object is written to `localStorage` with `isTest: true` and you are redirected to `index.html`.
+  </Step>
+</Steps>
+
+## Visual indicator
+
+Once test mode is active, every page that calls `verificarSesion()` applies two visual changes:
+
+1. The `<header>` background color changes to `#d35400` (orange).
+2. The logo text has `[MODO PRUEBAS]` appended to it.
+
+These changes are applied by `verificarSesion()` in `script.js` whenever `sesion.isTest` is `true`:
+
+```javascript
+if (sesion.isTest) {
+  const header = document.querySelector("header");
+  if (header) {
+    header.style.backgroundColor = "#d35400";
+    const logo = document.querySelector(".logo");
+    if (logo && !logo.textContent.includes("PRUEBAS")) {
+      logo.textContent = logo.textContent + " [MODO PRUEBAS]";
+    }
+  }
+}
+```
+
+## Data isolation
+
+### localStorage keys
+
+The `obtenerClaveStorage(base)` function checks `sesion.isTest` and appends `_test` to every storage key when test mode is active:
+
+```javascript
+function obtenerClaveStorage(base) {
+  const sesion = obtenerSesion();
+  if (sesion && sesion.isTest) {
+    return base + "_test";
+  }
+  return base;
+}
+```
+
+This means all reads and writes use separate keys:
+
+| Base key | Production key | Test key |
+|---|---|---|
+| `productos` | `productos` | `productos_test` |
+| `alquileres` | `alquileres` | `alquileres_test` |
+| `consecutivoDocumental` | `consecutivoDocumental` | `consecutivoDocumental_test` |
+
+Data written during a test session never appears in a production session, and vice versa.
+
+### MongoDB database
+
+When `isTest: true`, sync operations target the `pycasas_test` database instead of `pycasas`:
+
+- `POST /api/exportar` receives `{ isTest: true }` in the request body and writes to `pycasas_test`.
+- `GET /api/productos?test=true` reads from `pycasas_test`.
+- `GET /api/alquileres?test=true` reads from `pycasas_test`.
+
+The `test` query parameter is derived automatically from `obtenerSesion()?.isTest` in the client code — you do not need to set it manually.
+
+<Note>
+  The `pycasas_test` database is a completely separate MongoDB database. Syncing in test mode does not affect any document in the `pycasas` production database.
+</Note>
+
+## Session object in test mode
+
+The session stored in `localStorage` under `"usuario"` looks like this when test mode is active:
+
+```json
+{
+  "username": "Pruebas",
+  "role": "admin",
+  "permisos": ["inventario", "facturacion", "usuarios", "reportes", "productos"],
+  "isTest": true
+}
+```
+
+## Exiting test mode
+
+<Steps>
+  <Step title="Click Cerrar sesión">
+    Click the **Cerrar sesión** button on any page. This removes the `"usuario"` key from `localStorage` and redirects to `login.html`.
+  </Step>
+  <Step title="Log in with a production account">
+    Enter the credentials for a production account (for example, `Pycasas2012`). The new session will have `isTest: false` and all storage keys will revert to their production names.
+  </Step>
+</Steps>
+
+<Warning>
+  Do not use the `Pruebas` account for real operations. Any rentals, products, or changes made while `isTest: true` are stored under `_test` keys and synced to `pycasas_test`. They will not appear in production reports or inventories.
+</Warning>
+
+## Use cases
+
+- **Staff training:** Let new employees practice creating rentals and processing returns without touching real inventory.
+- **Feature demonstration:** Show stakeholders the full rental workflow using sample data.
+- **Integration testing:** Verify that MongoDB sync, invoice generation, and return calculations work correctly before using them in production.

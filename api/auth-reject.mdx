@@ -1,0 +1,122 @@
+---
+title: 'Reject user'
+description: 'Permanently delete a pending user account by token (email link) or by MongoDB ObjectId (admin UI).'
+---
+
+There are two endpoints for rejecting a user account. Both **permanently delete** the user record from the `usuarios` collection and send a rejection email to the user.
+
+<Warning>
+  Rejection is irreversible. The user document is deleted and cannot be recovered. The user must register again if the rejection was a mistake.
+</Warning>
+
+| Endpoint | Trigger | Response format |
+|---|---|---|
+| `GET /api/rechazar-usuario` | Email link | HTML page |
+| `POST /api/rechazar-usuario-id/:id` | Admin UI | JSON |
+
+---
+
+## GET /api/rechazar-usuario
+
+Token-based rejection. The link is sent to `tecnico@pycasas.co` when a user registers. Clicking it opens this endpoint in a browser.
+
+### Query parameters
+
+<ParamField query="token" type="string" required>
+  The `tokenRechazo` value stored on the user record. Generated as a 20-byte random hex string at registration.
+</ParamField>
+
+### Behavior
+
+1. Looks up the user by `tokenRechazo`.
+2. Permanently deletes the user document with `deleteOne`.
+3. Sends a rejection email to the user's registered email address.
+4. Returns an HTML confirmation page.
+
+### Responses
+
+**Success** — Returns an HTML page confirming rejection.
+
+**Invalid or already-used token** — Returns the HTML string:
+
+```html
+<h1>Token inválido o usuario ya procesado.</h1>
+```
+
+**Missing token** — Returns the HTML string:
+
+```html
+<h1>Token inválido</h1>
+```
+
+### Example
+
+```bash
+curl "https://your-domain.com/api/rechazar-usuario?token=b7e3d2f1a4c5689034567890123456789012bcde"
+```
+
+---
+
+## POST /api/rechazar-usuario-id/:id
+
+ID-based rejection. Used by the admin UI to reject accounts by MongoDB `ObjectId`.
+
+### Path parameters
+
+<ParamField path="id" type="string" required>
+  The MongoDB `ObjectId` of the user document (24-character hex string).
+</ParamField>
+
+### Behavior
+
+1. Looks up the user by `ObjectId`.
+2. Permanently deletes the user document with `deleteOne`.
+3. Sends a rejection email to the user's registered email address.
+4. Returns JSON.
+
+### Response fields
+
+**200 — Rejected**
+
+<ResponseField name="ok" type="boolean">
+  `true` when the user was deleted successfully.
+</ResponseField>
+
+<ResponseField name="msg" type="string">
+  `"Usuario rechazado"`.
+</ResponseField>
+
+**404 — Not found**
+
+<ResponseField name="error" type="string">
+  `"Usuario no encontrado"` — no user exists with the provided ObjectId.
+</ResponseField>
+
+**500 — Server error**
+
+<ResponseField name="error" type="string">
+  Error message from the server or MongoDB driver.
+</ResponseField>
+
+### Example
+
+```bash
+curl -X POST https://your-domain.com/api/rechazar-usuario-id/64f1a2b3c4d5e6f7a8b9c0d1
+```
+
+**200 response**
+
+```json
+{
+  "ok": true,
+  "msg": "Usuario rechazado"
+}
+```
+
+**404 response**
+
+```json
+{
+  "error": "Usuario no encontrado"
+}
+```

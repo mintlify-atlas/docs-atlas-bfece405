@@ -1,0 +1,108 @@
+---
+title: "Exporting rental history"
+description: "Download the complete rental history as a CSV file for use in spreadsheet tools like Excel."
+---
+
+The **Descargar Historial CSV** button on the rental checkout page (`alquiler_salida.html`) lets you export all rental records — both active and returned — to a CSV file. It calls `descargarHistorialCSV()` in `script.js`.
+
+## Access
+
+The export button appears in the **Historial de Alquileres / Remisiones** table for any user with access to the rental checkout page. This requires the `facturacion` **or** `productos` permission (the same requirement as the checkout page itself).
+
+## File details
+
+| Property | Value |
+|---|---|
+| **Filename** | `Historial_Alquileres_PYME_YYYY-MM-DD.csv` |
+| **Encoding** | UTF-8 with BOM (`\uFEFF` prefix) |
+| **Delimiter** | Comma (`,`) |
+| **Date in filename** | `new Date().toISOString().slice(0, 10)` — the export date in `YYYY-MM-DD` format |
+
+<Note>
+  The UTF-8 BOM (`\uFEFF`) prefix is included so that Microsoft Excel recognizes the encoding correctly and displays accented characters and special symbols without garbling.
+</Note>
+
+## CSV columns
+
+The exported file has the following 16 columns in this order:
+
+| # | Column header | Source field | Notes |
+|---|---|---|---|
+| 1 | `ID Alquiler` | `a.id` | Numeric timestamp ID |
+| 2 | `Estado` | `a.estado.toUpperCase()` | `ACTIVO` or `DEVUELTO` |
+| 3 | `Cliente` | `a.cliente.nombre` | Quoted string |
+| 4 | `Cedula/NIT` | `a.cliente.identificacion` | Quoted string |
+| 5 | `Telefono` | `a.cliente.telefono` | Quoted string |
+| 6 | `Direccion` | `a.cliente.direccion` | Quoted string |
+| 7 | `Articulos` | Formatted items string | See format below |
+| 8 | `Fecha Salida` | `a.fechaSalida` | Locale date string, quoted |
+| 9 | `Fecha Devolucion` | `a.fechaDevolucionReal` | `"-"` for active rentals |
+| 10 | `Dias Liquidados` | `a.dias \|\| 0` | `0` for active rentals |
+| 11 | `Subtotal Diario` | `a.subtotalDia \|\| 0` | COP amount without formatting |
+| 12 | `Garantia Base` | `a.garantia \|\| 0` | Original deposit in COP |
+| 13 | `Garantia Cobrada` | See note below | `0` or the retained amount |
+| 14 | `Total Pagado` | `a.totalPagar \|\| 0` | Final amount in COP |
+| 15 | `Registrado Por` | `a.registradoPor` | Username, quoted |
+| 16 | `Observaciones` | `a.observaciones` | Quoted string; empty if none |
+
+### Items column format
+
+The `Articulos` column concatenates all rented items into a single quoted string:
+
+```
+"nombre1 (x2) | nombre2 (x1)"
+```
+
+Each item is formatted as `nombre (xN)` where `N` is the quantity. Items are separated by ` | `.
+
+```javascript
+const articulos = a.items.map(i => `${i.nombre} (x${i.cantidad})`).join(" | ");
+```
+
+### Guarantee cobrada column
+
+The `Garantia Cobrada` column reflects the amount actually retained from the client's deposit:
+
+- If `a.garantiaCobrada !== true`: the value is `0`.
+- If `a.garantiaCobrada === true`: the value is `a.garantia || 0`.
+
+```javascript
+a.garantiaCobrada === true ? (a.garantia || 0) : 0
+```
+
+<Note>
+  `garantiaCobrada` is set to `true` or `false` only after a return is processed. For active rentals, this field is not yet set, so `Garantia Cobrada` will be `0`.
+</Note>
+
+## Quoting rules
+
+String fields are passed through an internal `escapillas()` function that:
+
+1. Converts the value to a string.
+2. Escapes any internal double-quote characters by doubling them (`"` → `""`).
+3. Wraps the result in double quotes.
+
+Numeric fields (`ID Alquiler`, `Dias Liquidados`, `Subtotal Diario`, `Garantia Base`, `Garantia Cobrada`, `Total Pagado`) are written without quotes.
+
+## How the download works
+
+Clicking **Descargar Historial CSV** triggers this flow:
+
+<Steps>
+  <Step title="Read rentals">
+    `descargarHistorialCSV()` reads all rentals from `localStorage` under the key `alquileres`. If the array is empty, an alert is shown and no file is created.
+  </Step>
+  <Step title="Build the CSV string">
+    The function joins the header row and all data rows with newline characters.
+  </Step>
+  <Step title="Create a Blob">
+    A `Blob` is created with `type: "text/csv;charset=utf-8;"` and the `\uFEFF` BOM prepended.
+  </Step>
+  <Step title="Trigger the download">
+    A hidden `<a>` element is created with `href` pointing to the Blob URL and the computed filename in the `download` attribute. The element is clicked programmatically and then removed from the DOM.
+  </Step>
+</Steps>
+
+<Tip>
+  The exported file includes every rental ever recorded in this browser's `localStorage`, not just the ones currently visible on screen. Export regularly to maintain an off-system backup of the rental history.
+</Tip>

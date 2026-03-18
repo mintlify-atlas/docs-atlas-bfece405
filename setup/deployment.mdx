@@ -1,0 +1,126 @@
+---
+title: 'Deployment'
+description: 'Run Pycasas locally or deploy it to Vercel.'
+---
+
+## Local development
+
+Pycasas runs as a Node.js/Express server. Static HTML, CSS, and JS files are served directly from `process.cwd()` — the directory where you launch the process.
+
+<Steps>
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+  <Step title="Create your environment file">
+    Copy the example below and save it as `.env` in the project root. See [Environment variables](/setup/environment) for details on each variable.
+
+    ```bash
+    MONGODB_URI=mongodb://127.0.0.1:27017
+    PORT=3000
+    ```
+  </Step>
+  <Step title="Start the server">
+    ```bash
+    node server.js
+    ```
+
+    The terminal will print:
+
+    ```
+    ✅ Conectado a MongoDB
+    🚀 Servidor corriendo en http://localhost:3000
+    ```
+  </Step>
+  <Step title="Open the app">
+    Navigate to [http://localhost:3000](http://localhost:3000). The root route serves `index.html` from the project directory.
+  </Step>
+</Steps>
+
+<Note>
+  Individual HTML pages are available at `/:page.html` (e.g., `http://localhost:3000/login.html`). The Express server resolves these from `baseDir = process.cwd()`.
+</Note>
+
+## Vercel deployment
+
+The repository includes a `vercel.json` that configures `server.js` as a serverless function using `@vercel/node`. All routes — both API calls and page requests — are forwarded to the same handler.
+
+```json vercel.json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "server.js" },
+    { "src": "/(.*)",     "dest": "server.js" }
+  ]
+}
+```
+
+<Steps>
+  <Step title="Install the Vercel CLI">
+    ```bash
+    npm install -g vercel
+    ```
+  </Step>
+  <Step title="Link your project">
+    Run this from the project root and follow the prompts:
+
+    ```bash
+    vercel link
+    ```
+  </Step>
+  <Step title="Set environment variables in the Vercel dashboard">
+    Go to **Project → Settings → Environment Variables** and add the following:
+
+    | Variable | Description |
+    |---|---|
+    | `MONGODB_URI` | Your MongoDB Atlas connection string |
+    | `PORT` | Optional — Vercel manages the port automatically |
+
+    <Warning>
+      `MONGODB_URI` must be set before deploying. Without it the server falls back to `mongodb://127.0.0.1:27017`, which is unreachable from Vercel's runtime.
+    </Warning>
+  </Step>
+  <Step title="Deploy">
+    ```bash
+    vercel --prod
+    ```
+
+    Vercel builds `server.js` with `@vercel/node` and routes all traffic through it.
+  </Step>
+</Steps>
+
+<Tip>
+  Use `vercel env pull` to download your Vercel environment variables into a local `.env` file for development.
+</Tip>
+
+## Health check
+
+Once deployed, verify connectivity with the `/api/health` endpoint:
+
+```bash
+curl https://<your-deployment>.vercel.app/api/health
+```
+
+A successful response looks like:
+
+```json
+{ "ok": true, "mongo": "up", "timestamp": "2026-03-18T00:00:00.000Z" }
+```
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Environment variables" icon="sliders" href="/setup/environment">
+    Configure MONGODB_URI, PORT, and Gmail SMTP credentials.
+  </Card>
+  <Card title="MongoDB setup" icon="database" href="/setup/mongodb">
+    Create a free Atlas cluster and get your connection string.
+  </Card>
+</Columns>

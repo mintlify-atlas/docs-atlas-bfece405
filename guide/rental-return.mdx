@@ -1,0 +1,106 @@
+---
+title: "Rental return"
+description: "Process the return of rented materials, calculate rental days and final cost, and issue the invoice for a completed rental."
+---
+
+The rental return page (`alquiler_devolucion.html`) is where you close an active rental. It calls `initAlquilerDevolucion()` on load, which verifies your session, renders the sidebar, initializes the guarantee checkbox state with `actualizarEstadoCobroGarantiaDevolucion()`, and loads the recent return history with `cargarHistorialDevoluciones()`.
+
+## Access
+
+You need the `facturacion` **or** `productos` permission to use this page. The same roles that can register a rental checkout can also process returns. See [Roles and permissions](/guide/roles-permissions) for the full breakdown.
+
+## Searching for an active rental
+
+Type in the **Buscar por nombre, cédula o ID de alquiler** field. `buscarAlquilerActivo()` filters rentals from `localStorage` in real time, returning only records where `estado === "activo"`. The search matches against:
+
+- `cliente.nombre` (case-insensitive)
+- `cliente.identificacion` (exact substring)
+- `String(a.id)` (rental ID)
+
+The results table shows **ID**, **Cliente**, **Cédula**, **Artículos**, **Salida**, and a **Devolver** button.
+
+## Selecting a rental
+
+Clicking **Devolver** calls `seleccionarAlquilerDevolucion(id)`. The function:
+
+1. Loads the rental record from `localStorage`.
+2. Renders the rental detail table in `#detalle-alquiler`, showing:
+   - ID Alquiler
+   - Cliente
+   - Cédula/NIT
+   - Teléfono
+   - Fecha Salida
+   - Garantía registrada
+3. Renders the list of items to return with **Código**, **Nombre**, **Cantidad**, and **Precio/día**.
+4. Pre-fills the guarantee checkbox and amount based on the original deposit.
+5. Scrolls the `#seccion-devolucion` panel into view.
+
+## Guarantee charge at return
+
+The return form includes a guarantee section:
+
+| Control | Element ID | Behavior |
+|---|---|---|
+| Checkbox | `aplicar-cobro-garantia` | When checked, the guarantee amount is retained. When unchecked, it is refunded. |
+| Amount field | `monto-cobro-garantia` | Editable COP amount when the checkbox is checked; disabled otherwise. |
+
+`actualizarEstadoCobroGarantiaDevolucion()` keeps the amount field in sync with the checkbox state — it is read-only when the checkbox is unchecked.
+
+<Note>
+  The amount field is pre-filled with the original deposit from the rental record. You can lower it (e.g., to apply only a partial charge) but you cannot enter a negative value.
+</Note>
+
+## Days calculation
+
+When you confirm a return, `confirmarDevolucion()` calculates the number of days liquidated:
+
+```javascript
+const diferenciaMs = fechaDevolucion.getTime() - fechaSalida.getTime();
+const diasLiquidados = Math.max(1, Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24)));
+```
+
+The calculation uses `fechaSalidaISO` (the ISO timestamp recorded at checkout) and the current date/time as the return timestamp. A minimum of 1 day is always charged, even if the same-day return happens within the first 24 hours.
+
+## Final cost calculation
+
+Once days are known, the final amounts are computed:
+
+| Value | Formula |
+|---|---|
+| `totalAlquilerBase` | `subtotalDia * diasLiquidados` |
+| `garantiaOriginal` | `alquileres[idx].garantia` (original deposit) |
+| `garantiaRetenida` | `montoCobroGarantia` if checkbox is checked, else `0` |
+| `totalPagar` | `totalAlquilerBase - (garantiaOriginal - garantiaRetenida)` |
+
+## What changes on confirmation
+
+`confirmarDevolucion()` updates the rental record in `localStorage` with the following fields:
+
+| Field | New value |
+|---|---|
+| `estado` | `"devuelto"` |
+| `dias` | `diasLiquidados` |
+| `totalAlquiler` | `totalAlquilerBase` |
+| `totalPagar` | Final amount after guarantee adjustment |
+| `fechaDevolucionReal` | Return date/time as locale string |
+| `fechaDevolucionRealISO` | Return date/time as ISO 8601 |
+| `garantiaCobrada` | `true` or `false` based on checkbox |
+| `garantia` | `montoCobroGarantia` (the retained amount) |
+| `observacionesDevolucion` | Text from `#obs-devolucion` |
+| `devueltoPor` | `sesion.username` |
+
+Stock is also restored: each item's `stock` in `localStorage` is incremented by its `cantidad`.
+
+After saving, `exportarDatos()` syncs the updated data to MongoDB Atlas, and `factura_alquiler.html?id=<rental_id>` opens automatically in a new tab for printing or review.
+
+<Warning>
+  Confirming a return is irreversible from the UI. The rental `estado` is set to `"devuelto"` and stock is restored immediately. There is no undo button.
+</Warning>
+
+## Return history section
+
+`cargarHistorialDevoluciones()` renders the 15 most recent returned rentals in reverse chronological order. The table displays **ID**, **Cliente**, **Cédula**, **Artículos**, **Fecha Salida**, **Total**, and **Estado** (always a green `Devuelto` badge), plus links to the **Remisión** and **Factura** documents for each record.
+
+<Tip>
+  You can re-open the remission or invoice for any returned rental at any time by clicking the document links in the history table.
+</Tip>

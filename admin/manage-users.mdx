@@ -1,0 +1,90 @@
+---
+title: "Managing users"
+description: "How to view and act on pending user requests from the admin user management panel in Pycasas - Módulo de Alquileres."
+---
+
+The user management panel lets an administrator review accounts that have registered but have not yet been approved. It is accessible only to users with the `admin` role.
+
+## Accessing the panel
+
+From the dashboard sidebar, click **Gestionar Usuarios**. The link resolves to `admin_usuarios.html` and is only visible when the active session has `role: "admin"`.
+
+<Note>
+  The sidebar entry uses `soloRol: "admin"` in `script.js`. Users with any other role do not see this link and cannot navigate to the page.
+</Note>
+
+## How pending users appear
+
+When the page loads, it calls `GET /api/usuarios-pendientes`. The server queries the `usuarios` collection in the `pycasas` MongoDB database for all documents where `activo: false` and returns them as an array.
+
+Each pending user is displayed as a card with the following information:
+
+| Field | Description |
+|---|---|
+| **Nombre** | Full name provided during registration |
+| **Usuario** | Username (`username` field) |
+| **Email** | Email address |
+| **Rol** | Requested role (`admin`, `vendedor`, `bodeguero`, or `gerente`) |
+| **Fecha** | Registration date (`fechaRegistro`), formatted as `dd/mm/yyyy` |
+
+<Note>
+  The API strips `tokenAprobacion` and `tokenRechazo` before sending the response. The card never exposes approval or rejection tokens to the browser.
+</Note>
+
+### API response shape
+
+Each object in the response array has the following fields:
+
+```json
+{
+  "_id": "664a1b2c3d4e5f6a7b8c9d0e",
+  "nombre": "Juan Pérez",
+  "email": "juan@empresa.com",
+  "username": "juanperez",
+  "role": "vendedor",
+  "fechaRegistro": "2024-05-20T14:32:00.000Z"
+}
+```
+
+If there are no pending users, the panel displays: *"No hay usuarios pendientes de aprobación."*
+
+## Actions
+
+Each user card has two buttons:
+
+<CardGroup cols={2}>
+  <Card title="Aprobar" icon="check">
+    Green button. Sends `POST /api/aprobar-usuario-id/:id`. Sets the user account to active and notifies the user by email. See [Approving and rejecting users](/admin/approve-reject-users) for what happens on the server.
+  </Card>
+  <Card title="Rechazar" icon="x">
+    Red button. Sends `POST /api/rechazar-usuario-id/:id`. Permanently deletes the user record from MongoDB and sends a rejection email. This action cannot be undone.
+  </Card>
+</CardGroup>
+
+Both buttons show a browser confirmation dialog before proceeding. After the action completes, the panel automatically reloads the list.
+
+## Full approval workflow
+
+The following steps describe the end-to-end lifecycle from registration request to active account:
+
+<Steps>
+  <Step title="User submits a registration request">
+    The user fills in `registro.html` and clicks **Registrar Usuario**. The server creates an inactive account (`activo: false`, `aprobado: false`) in the `usuarios` collection and generates two single-use tokens.
+  </Step>
+  <Step title="Admin receives a notification email">
+    An email is sent to `tecnico@pycasas.co` with the user's details and two action links: **Aprobar Usuario** and **Rechazar Usuario**. The email is sent via `nodemailer` using the Gmail SMTP transport in `server.js`.
+  </Step>
+  <Step title="Admin reviews the request">
+    The admin can act either by clicking a link in the email (token-based) or by opening **Gestionar Usuarios** in the dashboard and using the **Aprobar** or **Rechazar** buttons (ID-based). Both paths produce the same result.
+  </Step>
+  <Step title="User is notified of the decision">
+    The server sends an automated email to the user's registered address:
+
+    - **Approved:** Subject `✅ Tu cuenta ha sido aprobada - Gestión PYME`. The user can now log in.
+    - **Rejected:** Subject `❌ Solicitud de cuenta rechazada - Gestión PYME`. The user record is deleted.
+  </Step>
+</Steps>
+
+<Warning>
+  Rejecting a user permanently deletes their record. If you reject someone by mistake, they must submit a new registration request.
+</Warning>

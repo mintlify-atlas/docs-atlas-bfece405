@@ -1,0 +1,120 @@
+---
+title: "User registration"
+description: "How to request a new account in Pycasas - Módulo de Alquileres, and how the admin approval flow works."
+---
+
+New accounts require administrator approval before they can be used to log in. The registration form (`registro.html`) submits a request; the administrator at `tecnico@pycasas.co` then approves or rejects it by email.
+
+<Note>
+  Only an administrator can navigate to `registro.html` from the sidebar. However, the page is also linked from the login screen footer, so anyone with the URL can submit a request.
+</Note>
+
+## Registration form fields
+
+| Field | Element | Validation |
+|---|---|---|
+| **Nombre completo** | Text input | Required |
+| **Correo electrónico** | Email input | Required, must be unique |
+| **Nombre de usuario** | Text input | Required, must be unique |
+| **Contraseña** | Password input | Required, minimum 6 characters |
+| **Confirmar contraseña** | Password input | Must match **Contraseña** |
+| **Rol asignado** | Dropdown selector | One of `vendedor`, `bodeguero`, `gerente`, `admin` |
+
+If the two password fields do not match, the form displays an error client-side and does not submit the request to the server.
+
+## Submitting a registration request
+
+<Steps>
+  <Step title="Fill in the form">
+    Open `registro.html` and complete all required fields. Choose the role that corresponds to the responsibilities of the new user.
+  </Step>
+  <Step title="Submit the form">
+    Click **Registrar Usuario**. The browser sends a `POST /api/registro` request with the following JSON body:
+
+    ```json
+    {
+      "nombre": "Juan Pérez",
+      "email": "juan@empresa.com",
+      "username": "juanperez",
+      "password": "secreto123",
+      "role": "vendedor"
+    }
+    ```
+  </Step>
+  <Step title="Wait for the confirmation message">
+    On success, the page shows:
+
+    > ✅ ¡Registro enviado exitosamente! Tu cuenta está pendiente de aprobación. Se ha enviado una notificación a **tecnico@pycasas.co** para que revise tu solicitud. Recibirás un correo cuando tu cuenta sea aprobada. No podrás iniciar sesión hasta que sea autorizada.
+
+    After 6 seconds, the page automatically redirects to `login.html`.
+  </Step>
+</Steps>
+
+## What happens on the server (`POST /api/registro`)
+
+<Steps>
+  <Step title="Check for duplicates">
+    The server queries the `usuarios` collection in the `pycasas` database. If the username or email address already exists, the request is rejected with HTTP 400:
+
+    - `"El nombre de usuario ya está en uso."`
+    - `"El correo electrónico ya está registrado."`
+  </Step>
+  <Step title="Hash the password">
+    The password is hashed using `bcrypt` with 10 salt rounds before being stored. The plain-text password is never saved.
+
+    ```javascript
+    const salt = await bcrypt.genSalt(10);
+    const hashPassword = await bcrypt.hash(password, salt);
+    ```
+  </Step>
+  <Step title="Generate approval tokens">
+    Two random 20-byte hex tokens are generated using `crypto.randomBytes`:
+
+    - `tokenAprobacion` — used in the approval link
+    - `tokenRechazo` — used in the rejection link
+  </Step>
+  <Step title="Save the user as inactive">
+    The new user document is inserted into MongoDB with:
+
+    ```json
+    {
+      "activo": false,
+      "aprobado": false
+    }
+    ```
+
+    The account cannot be used to log in until both fields are set to `true`.
+  </Step>
+  <Step title="Email the administrator">
+    An HTML email is sent to `tecnico@pycasas.co` with the user details and two action buttons:
+
+    - **Aprobar Usuario** — links to `GET /api/aprobar-usuario?token=<tokenAprobacion>`
+    - **Rechazar Usuario** — links to `GET /api/rechazar-usuario?token=<tokenRechazo>`
+  </Step>
+</Steps>
+
+## Admin approval flow
+
+When the administrator clicks a link in the email:
+
+<Columns cols={2}>
+  <Card title="Approve" icon="check">
+    `GET /api/aprobar-usuario?token=...` sets `activo: true` and `aprobado: true` on the user document, removes both tokens, and sends a confirmation email to the user's registered address. The user can now log in.
+  </Card>
+  <Card title="Reject" icon="x">
+    `GET /api/rechazar-usuario?token=...` permanently deletes the user document from MongoDB and sends a rejection notification email to the user's registered address.
+  </Card>
+</Columns>
+
+<Warning>
+  Rejection deletes the user record entirely. If a rejected user wants to try again, they must submit a new registration request.
+</Warning>
+
+## User notification emails
+
+After the administrator acts, the user receives an automated email:
+
+- **Approved:** Subject line `✅ Tu cuenta ha sido aprobada - Gestión PYME`. Includes their username, role, and a link to `login.html`.
+- **Rejected:** Subject line `❌ Solicitud de cuenta rechazada - Gestión PYME`. Advises them to contact the administrator if they believe this is an error.
+
+Emails are sent via `nodemailer` using a Gmail SMTP transport configured in `server.js`.

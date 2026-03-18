@@ -1,0 +1,95 @@
+---
+title: "Logging in"
+description: "How to sign in to Pycasas - Módulo de Alquileres, including demo accounts and session behavior."
+---
+
+Open `login.html` in your browser to reach the sign-in screen. If you already have an active session, the page redirects you to `index.html` automatically.
+
+## Login form fields
+
+The form contains three required fields:
+
+| Field | Element | Description |
+|---|---|---|
+| **Usuario** | Text input | Your username, case-sensitive |
+| **Contraseña** | Password input | Your account password |
+| **Rol** | Dropdown selector | Must match the role assigned to your account |
+
+The role selector offers four options: **Administrador** (`admin`), **Vendedor** (`vendedor`), **Bodeguero** (`bodeguero`), and **Gerente** (`gerente`). Selecting a role that does not match your account returns an error.
+
+## How authentication works
+
+<Steps>
+  <Step title="Check demo accounts">
+    The browser first looks up your credentials in `USUARIOS_DEMO`, a hardcoded list in `script.js`. If the username, password, and role all match a demo entry, authentication succeeds immediately without a network request.
+  </Step>
+  <Step title="Fall back to MongoDB">
+    If no demo match is found, the browser sends a `POST /api/login` request to the backend. The server queries the `usuarios` collection in the `pycasas` MongoDB database, verifies the password with `bcrypt.compare`, and confirms that the selected role matches the stored role.
+  </Step>
+  <Step title="Check account approval">
+    For backend users, the server also checks that `activo: true`. Accounts registered through `registro.html` start as inactive and cannot log in until an administrator approves them. Attempting to sign in with an unapproved account returns HTTP 403 with the message: *"Tu cuenta aún no ha sido aprobada por tecnico@pycasas.co"*.
+  </Step>
+  <Step title="Store session">
+    On success, the session object is written to `localStorage` under the key `"usuario"` and the browser redirects to `index.html`.
+  </Step>
+</Steps>
+
+## Session object
+
+The value stored at `localStorage.getItem("usuario")` is a JSON object with the following fields:
+
+```json
+{
+  "username": "vendedor1",
+  "role": "vendedor",
+  "permisos": ["facturacion", "productos"],
+  "isTest": false
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `username` | string | The authenticated username |
+| `role` | string | One of `admin`, `vendedor`, `bodeguero`, `gerente` |
+| `permisos` | string[] | Permissions array derived from `PERMISOS_POR_ROL[role]` |
+| `isTest` | boolean | `true` only for the `Pruebas` demo account |
+
+## Demo accounts
+
+The following accounts are available without a database connection. They are defined in `USUARIOS_DEMO` in `script.js`.
+
+<Warning>
+  Demo account passwords are stored in plain text in the client-side JavaScript. Do not reuse these passwords for anything sensitive.
+</Warning>
+
+| Username | Password | Role | Notes |
+|---|---|---|---|
+| `Pycasas2012` | `Pycasas2012` | `admin` | Primary production admin account |
+| `Pruebas` | `123` | `admin` | Test mode — data is isolated, header turns orange |
+| `vendedor1` | `1234` | `vendedor` | Demo seller account |
+| `bodeguero1` | `1234` | `bodeguero` | Demo warehouse account |
+| `gerente1` | `1234` | `gerente` | Demo manager account |
+
+## Test mode
+
+Signing in as `Pruebas` activates test mode (`isTest: true`).
+
+<Note>
+  Test mode data is completely isolated from production. `localStorage` keys are suffixed with `_test` (e.g., `productos_test`, `alquileres_test`), so test activity does not affect real records.
+</Note>
+
+While in test mode:
+
+- The page header background changes to `#d35400` (orange).
+- The logo text has `[MODO PRUEBAS]` appended.
+- All `localStorage` reads and writes use `_test`-suffixed keys.
+- The session object contains `"isTest": true`.
+
+## Signing out
+
+Click the **Cerrar sesión** button on any page. This calls `cerrarSesion()`, which:
+
+1. Removes the `"usuario"` key from `localStorage`.
+2. Redirects the browser to `login.html`.
+
+Any page that calls `verificarSesion()` on load will also redirect to `login.html` if no session is found.

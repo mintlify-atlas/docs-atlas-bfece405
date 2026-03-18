@@ -1,0 +1,110 @@
+---
+title: 'Login'
+description: 'Authenticate a user and retrieve their session details.'
+---
+
+`POST /api/login`
+
+Validates a username, password, and role against the `usuarios` collection. Returns session details on success.
+
+<Note>
+  If `isDemoUser` is `true` in the request body, the server returns `{ ok: true }` immediately without hitting the database. Demo user state is managed entirely by the frontend.
+</Note>
+
+## Request body
+
+<ParamField body="username" type="string" required>
+  The user's username.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's plain-text password. The server compares it against the bcrypt hash stored in MongoDB.
+</ParamField>
+
+<ParamField body="role" type="string" required>
+  The role the user is attempting to log in with. Must match the `role` field stored on the user record.
+</ParamField>
+
+<ParamField body="isDemoUser" type="boolean">
+  When `true`, bypasses database authentication and returns `{ ok: true }` immediately.
+</ParamField>
+
+## Response fields
+
+### 200 — Authenticated
+
+<ResponseField name="ok" type="boolean">
+  `true` on successful authentication.
+</ResponseField>
+
+<ResponseField name="usuario" type="object">
+  Authenticated user details. Not present when `isDemoUser` is `true`.
+  <Expandable title="properties">
+    <ResponseField name="username" type="string">
+      The user's username.
+    </ResponseField>
+    <ResponseField name="role" type="string">
+      The user's assigned role.
+    </ResponseField>
+    <ResponseField name="isTest" type="boolean">
+      Always `false` for real users. Frontend uses this flag for test-mode sessions.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### 401 — Unauthorized
+
+<ResponseField name="error" type="string">
+  One of:
+  - `"Usuario o contraseña incorrectos"` — username not found or password mismatch.
+  - `"Rol incorrecto para este usuario"` — password correct but the requested role does not match the stored role.
+</ResponseField>
+
+### 403 — Account pending approval
+
+<ResponseField name="error" type="string">
+  `"Tu cuenta aún no ha sido aprobada por tecnico@pycasas.co"` — the user record exists but `activo` is `false`.
+</ResponseField>
+
+### 500 — Server error
+
+<ResponseField name="error" type="string">
+  Error message from the server or MongoDB driver.
+</ResponseField>
+
+## Example
+
+```bash
+curl -X POST https://your-domain.com/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "Pycasas2012", "password": "Pycasas2012", "role": "admin"}'
+```
+
+**200 response**
+
+```json
+{
+  "ok": true,
+  "usuario": {
+    "username": "Pycasas2012",
+    "role": "admin",
+    "isTest": false
+  }
+}
+```
+
+**401 response**
+
+```json
+{
+  "error": "Usuario o contraseña incorrectos"
+}
+```
+
+**403 response**
+
+```json
+{
+  "error": "Tu cuenta aún no ha sido aprobada por tecnico@pycasas.co"
+}
+```

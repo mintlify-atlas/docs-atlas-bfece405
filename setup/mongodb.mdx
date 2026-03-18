@@ -1,0 +1,134 @@
+---
+title: 'MongoDB setup'
+description: 'Create a MongoDB Atlas cluster and connect Pycasas to it.'
+---
+
+Pycasas supports two MongoDB targets:
+
+- **Local** — a MongoDB instance on your machine at `mongodb://127.0.0.1:27017`, useful for development with MongoDB Compass.
+- **Atlas** — a free cloud cluster, required for production deployments on Vercel.
+
+## Create a free Atlas cluster
+
+<Steps>
+  <Step title="Create an Atlas account">
+    Go to [https://www.mongodb.com/atlas](https://www.mongodb.com/atlas) and sign up or log in.
+  </Step>
+  <Step title="Create a new project">
+    In the Atlas dashboard, click **New Project**, give it a name (e.g. `pycasas`), and click **Next**.
+  </Step>
+  <Step title="Build a cluster">
+    Select **Create a cluster**, choose the **M0 Free** tier, pick a cloud region close to your users, and click **Create Deployment**.
+  </Step>
+  <Step title="Create a database user">
+    When prompted, create a username and a strong password. Save these — you will need them in the connection string.
+
+    <Warning>
+      Use a dedicated database user for the application. Do not use your Atlas account credentials.
+    </Warning>
+  </Step>
+  <Step title="Allow network access">
+    Go to **Security → Network Access** and add an IP address:
+    - For development: add your current IP.
+    - For Vercel: add `0.0.0.0/0` (allow all) since Vercel uses dynamic IPs.
+  </Step>
+  <Step title="Get the connection string">
+    Go to **Deployment → Database**, click **Connect** on your cluster, select **Drivers**, choose **Node.js**, and copy the connection string. It looks like:
+
+    ```
+    mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
+    ```
+
+    Replace `<user>` and `<password>` with the credentials created in the previous step.
+  </Step>
+  <Step title="Set MONGODB_URI">
+    Paste the connection string as the `MONGODB_URI` environment variable — in your `.env` file for local use, or in the Vercel dashboard for production.
+
+    See [Environment variables](/setup/environment) for details.
+  </Step>
+</Steps>
+
+## Connection configuration
+
+The server connects using `ServerApiVersion.v1` with strict mode and deprecation errors enabled:
+
+```javascript
+client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+});
+```
+
+This enforces the Stable API contract and surfaces deprecation warnings immediately, making version upgrades easier to manage.
+
+## Databases and collections
+
+The server selects the database dynamically based on whether test mode is active:
+
+| Mode | Database name |
+|---|---|
+| Production | `pycasas` |
+| Test | `pycasas_test` |
+
+Test mode is triggered by passing `?test=true` on API requests (e.g. `GET /api/productos?test=true`) or by including `isTest: true` in the `POST /api/exportar` body.
+
+### Collections
+
+| Collection | Contents |
+|---|---|
+| `productos` | Rental property listings |
+| `alquileres` | Active and historical rental records |
+| `usuarios` | Registered user accounts (hashed passwords, roles, approval status) |
+
+## Data sync pattern
+
+`localStorage` is the primary data store on the client. MongoDB acts as a cloud backup that can be pushed to or restored from at any time.
+
+```
+Browser localStorage  ──POST /api/exportar──▶  MongoDB (cloud backup)
+                      ◀──GET /api/productos──
+                      ◀──GET /api/alquileres──
+```
+
+The export endpoint (`POST /api/exportar`) **replaces** collections entirely on each sync — it deletes all existing documents before inserting the new set:
+
+```javascript
+// POST /api/exportar
+await db.collection("productos").deleteMany({});
+if (Array.isArray(productos) && productos.length > 0) {
+  await db.collection("productos").insertMany(productos);
+}
+
+await db.collection("alquileres").deleteMany({});
+if (Array.isArray(alquileres) && alquileres.length > 0) {
+  await db.collection("alquileres").insertMany(alquileres);
+}
+```
+
+<Note>
+  Transactions are intentionally avoided to maintain compatibility with local MongoDB instances that do not have a replica set configured.
+</Note>
+
+## Local MongoDB
+
+For local development without Atlas, install [MongoDB Community Edition](https://www.mongodb.com/try/download/community) or use [MongoDB Compass](https://www.mongodb.com/products/compass). The default connection string requires no authentication:
+
+```bash
+MONGODB_URI=mongodb://127.0.0.1:27017
+```
+
+Leave `MONGODB_URI` unset in your `.env` and the server will fall back to this value automatically.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Environment variables" icon="sliders" href="/setup/environment">
+    Set MONGODB_URI and other configuration values.
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/setup/deployment">
+    Run locally or deploy to Vercel.
+  </Card>
+</Columns>

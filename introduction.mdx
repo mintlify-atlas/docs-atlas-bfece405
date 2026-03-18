@@ -1,0 +1,78 @@
+---
+title: "Introduction"
+description: "Pycasas Módulo de Alquileres — a web-based rental management system for SMEs"
+---
+
+## What is Pycasas?
+
+**Pycasas - Módulo de Alquileres** is a full-stack rental management platform designed for small and medium-sized businesses (SMEs). It streamlines the entire rental lifecycle — from inventory tracking and client checkout to billing, document generation, and reporting.
+
+The system runs as a web application backed by Express.js and MongoDB Atlas, with offline-capable localStorage data storage and optional sync to the cloud. It deploys seamlessly on Vercel.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Role-based access control" icon="shield-halved">
+    Four user roles — Admin, Gerente, Vendedor, and Bodeguero — each with scoped permissions to inventory, billing, and reporting modules.
+  </Card>
+  <Card title="Inventory management" icon="boxes-stacked">
+    Add, edit, delete, and visualize rental stock with real-time stock counters, low-stock alerts, and category filters.
+  </Card>
+  <Card title="Rental lifecycle" icon="arrow-right-arrow-left">
+    Register checkout and return events. The system deducts and restores stock automatically and calculates billing based on actual rental days.
+  </Card>
+  <Card title="Document generation" icon="file-invoice">
+    Automatically generates sequentially numbered remission notes (REM00001) and invoices (FVPA00001) for every rental event.
+  </Card>
+  <Card title="Reports & analytics" icon="chart-bar">
+    KPI dashboards showing total products, inventory value, estimated margin, stock alerts, and a top-5 products table by value.
+  </Card>
+  <Card title="CSV export" icon="file-csv">
+    Download the complete rental and return history as a CSV file for use in spreadsheets or external reporting tools.
+  </Card>
+  <Card title="MongoDB sync" icon="database">
+    Data lives in localStorage for offline capability and can be synced to MongoDB Atlas at any time with a single click.
+  </Card>
+  <Card title="User approval workflow" icon="user-check">
+    New users register and receive email approval from the administrator before gaining access. Powered by Nodemailer.
+  </Card>
+</CardGroup>
+
+## System overview
+
+```
+Browser (HTML/CSS/JS)
+  ├── localStorage (offline data layer)
+  └── Express.js API (server.js)
+        ├── /api/productos    — product catalog
+        ├── /api/alquileres   — rental records
+        ├── /api/exportar     — sync to MongoDB
+        └── /api/login|registro|... — auth endpoints
+              └── MongoDB Atlas (pycasas database)
+```
+
+## User roles at a glance
+
+| Role | Inventory | Billing | Reports | Users |
+|------|-----------|---------|---------|-------|
+| **Admin** | Full | Full | Full | Full |
+| **Gerente** | View + Edit | — | Full | — |
+| **Vendedor** | View | Full | — | — |
+| **Bodeguero** | View + Edit | — | — | — |
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Deploy the application and process your first rental in minutes.
+  </Card>
+  <Card title="Setup guide" icon="gear" href="/setup/deployment">
+    Step-by-step deployment instructions for Vercel and local environments.
+  </Card>
+  <Card title="User guide" icon="book-open" href="/guide/login">
+    Learn how to use every module in the system.
+  </Card>
+  <Card title="API reference" icon="code" href="/api/health">
+    Explore the REST API endpoints available in the backend.
+  </Card>
+</CardGroup>

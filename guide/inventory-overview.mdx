@@ -1,0 +1,74 @@
+---
+title: "Inventory overview"
+description: "Browse, filter, and inspect all rental items registered in Pycasas using the inventory visualization page."
+---
+
+The inventory visualization page (`productos_visualizacion.html`) gives every user with the `productos` permission a real-time view of the full product catalog. It opens by calling `initProductosVisualizacion()`, which loads the statistics panel and then renders the product table through `aplicarFiltros()`.
+
+## Stats panel
+
+At the top of the page, `cargarEstadisticasVisualizacion()` reads all products from `localStorage` and displays four summary cards:
+
+| Stat | Source | Description |
+|---|---|---|
+| **Total Productos** | `productos.length` | Number of distinct items in the catalog |
+| **Unidades en Stock** | `sum of p.stock` | Total quantity units across all products |
+| **Con Stock Bajo** | `p.stock <= (p.stockMin \|\| 0)` | Count of items at or below their minimum threshold |
+| **Valor Inventario** | `sum of p.precio * p.stock` | Aggregate rental value of all stock on hand |
+
+<Note>
+  Inventory value is calculated using the rental price (`precio`), not the purchase cost (`costo`). It represents the potential rental income if every unit were rented at unit price.
+</Note>
+
+## Filter bar
+
+Three controls appear above the product table. All three call `aplicarFiltros()` on change and can be combined. Click **Limpiar** to call `limpiarFiltros()` and reset all three at once.
+
+| Control | Element ID | Behavior |
+|---|---|---|
+| Text search | `filtro-texto` | Matches `p.codigo` or `p.nombre` (case-insensitive) |
+| Category | `filtro-cat` | Exact match against `p.categoria` |
+| Stock level | `filtro-stock` | `"bajo"`: `p.stock <= (p.stockMin \|\| 0)` · `"normal"`: `p.stock > (p.stockMin \|\| 0)` |
+
+### Available categories
+
+The category dropdown lists the fixed set of categories used across all product pages:
+
+- Andamios
+- Cerchas
+- Tacos
+- Herramientas menores
+- Herramientas mayores
+- Otro
+
+## Product table
+
+The filtered list renders as a table inside `#tabla-container`. Each row corresponds to one product.
+
+| Column | Field | Notes |
+|---|---|---|
+| **Código** | `p.codigo` | Rendered as `<code>` |
+| **Nombre** | `p.nombre` | Rendered in bold |
+| **Categoría** | `p.categoria` | Shown as an info badge |
+| **Precio** | `p.precio` | Rental price in COP |
+| **Costo** | `p.costo` | Purchase cost in COP; shows `–` if not set |
+| **Stock** | `p.stock` | Badge is **green** when stock is above `stockMin`, **red** when at or below |
+| **Proveedor** | `p.proveedor` | Shows `–` if not set |
+| **Fecha** | `p.fechaIngreso` | Date the product was first registered |
+| **Acciones** | — | Edit button links to `productos_edicion.html`; delete button links to `productos_eliminacion.html` |
+
+## Low-stock alert
+
+When a product's stock is at or below its `stockMin` value, the stock badge changes to `badge-danger` (red). A product with `stockMin` not set defaults to `0`, so any product with exactly zero units also triggers the red badge.
+
+<Warning>
+  The action buttons in the table are navigation links, not in-line editors. Clicking the edit or delete icon takes you to the respective page; it does not open a modal on this page.
+</Warning>
+
+## Empty states
+
+If no products exist in `localStorage` at all, the table area shows a prompt to add the first product with a link to `productos_ingreso.html`. If products exist but no results match the active filters, a plain text message is shown instead.
+
+## Access
+
+The page requires the `productos` permission. Roles that have it: `admin`, `gerente`, `vendedor`, `bodeguero`. Any other role that navigates directly to `productos_visualizacion.html` sees the access-denied message from `mostrarAccesoDenegado()`. See [Roles and permissions](/guide/roles-permissions) for the full breakdown.

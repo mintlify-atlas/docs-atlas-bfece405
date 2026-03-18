@@ -1,0 +1,167 @@
+---
+title: "Rental checkout"
+description: "Register a new rental and issue the remission note and invoice for a client taking materials from Pycasas."
+---
+
+The rental checkout page (`alquiler_salida.html`) is where you record a client picking up materials. It calls `initAlquilerSalida()` on load, which verifies your session, renders the sidebar, displays the current date/time in `#fecha-salida-reloj`, initializes the cost summary with `calcularTotalAlquiler()`, and loads the rental history table with `cargarAlquileresActivos()`.
+
+## Access
+
+You need the `facturacion` **or** `productos` permission to use this page.
+
+<CardGroup cols={2}>
+  <Card title="Admin" icon="shield">
+    Has `facturacion` and `productos` — full access.
+  </Card>
+  <Card title="Vendedor" icon="tag">
+    Has `facturacion` and `productos` — full access.
+  </Card>
+  <Card title="Gerente" icon="chart-bar">
+    Has `productos` only — can access rental checkout.
+  </Card>
+  <Card title="Bodeguero" icon="warehouse">
+    Has `productos` only — can access rental checkout.
+  </Card>
+</CardGroup>
+
+## Client information
+
+The top section of the form collects client data. All four fields are passed into the `cliente` object when the rental is saved.
+
+| Field | Element ID | Required | Notes |
+|---|---|---|---|
+| **Nombre del Cliente** | `cliente-nombre` | Yes | Full name or company name |
+| **Cédula / NIT** | `cliente-id` | Yes | National ID or tax number |
+| **Teléfono** | `cliente-tel` | No | Contact phone number |
+| **Dirección / Obra** | `cliente-dir` | No | Physical address or job-site description |
+
+The **Fecha y Hora de Salida** field is read-only. It is set automatically to `new Date().toLocaleString("es-CO")` when the page loads and stored as both a human-readable string (`fechaSalida`) and an ISO timestamp (`fechaSalidaISO`) when the rental is saved.
+
+## Guarantee deposit
+
+The **Depósito de Garantía** field (`garantia`, element ID `garantia`) accepts a COP amount. The deposit is deducted from the total due at checkout. Enter `0` if no deposit is collected.
+
+<Note>
+  The deposit is recorded in `garantia` and subtracted from the initial total. At return time, the system decides whether to retain or refund it based on the **Aplicar cobro de garantía** checkbox on the return page.
+</Note>
+
+## Adding items to the rental
+
+<Steps>
+  <Step title="Search for an article">
+    Type a product code or name in the **Buscar Artículo** field. `buscarArticuloAlquiler()` filters `localStorage` products in real time, showing only items with `stock > 0`. The results table shows **Código**, **Nombre**, **Categoría**, **Disponibles**, and **Precio/día**.
+  </Step>
+  <Step title="Click Agregar">
+    Click **Agregar** next to an article. A browser prompt asks for the quantity. The maximum you can enter is the product's available `stock`.
+  </Step>
+  <Step title="Adjust quantities">
+    Each row in the items table includes an editable quantity input. Changing the value calls `cambiarCantidadItem(idx, value)`, which validates the new quantity against `stockDisponible` and updates the running subtotal.
+  </Step>
+  <Step title="Remove an item if needed">
+    Click the trash icon in any row to call `quitarItemAlquiler(idx)`, which removes that line and recalculates totals.
+  </Step>
+</Steps>
+
+## Items table
+
+The table inside `#tbody-items-alquiler` has the following columns:
+
+| Column | Source field | Notes |
+|---|---|---|
+| **Código** | `item.codigo` | Displayed as `<code>` |
+| **Nombre** | `item.nombre` | Product display name |
+| **Disponibles** | `item.stockDisponible` | Stock at the moment the item was added |
+| **Cantidad** | `item.cantidad` | Editable; capped at `stockDisponible` |
+| **Precio/día (COP)** | `item.precioAlquiler` | Unit rental price per day |
+| **Subtotal** | `item.precioAlquiler * item.cantidad` | Calculated per row |
+| **Quitar** | — | Removes the row from `_itemsAlquiler` |
+
+## Cost summary
+
+`calcularTotalAlquiler()` runs every time the item list or the guarantee amount changes. It produces the values shown in `#resumen-costos-box`:
+
+| Display label | Calculation |
+|---|---|
+| **Precio total por día** | `sum(item.precioAlquiler * item.cantidad)` |
+| **Días de Alquiler** | Shown as "Se liquida en devolución" — days are calculated at return time |
+| **Valor Alquiler** | Equal to `subtotalDia - garantia` at checkout (finalized at return) |
+| **Depósito de Garantía** | The value entered in the `garantia` field |
+| **Total a pagar al inicio** | `subtotalDia - garantia` |
+
+<Warning>
+  The total shown at checkout is only the initial amount collected (deposit deducted). The full rental cost is liquidated when the client returns the materials.
+</Warning>
+
+## Document numbering
+
+Every rental generates a shared consecutive document number managed by `obtenerSiguienteConsecutivoDocumental()`. From that single counter, two document numbers are produced:
+
+| Document | Format | Example |
+|---|---|---|
+| Remission note | `REM` + 5-digit zero-padded number | `REM00001` |
+| Invoice | `FVPA` + 5-digit zero-padded number | `FVPA00001` |
+
+Both documents for the same rental share the same numeric sequence. See [Invoices and remissions](/guide/invoices-remissions) for more detail.
+
+## Saving the rental
+
+Clicking **Registrar Alquiler** calls `guardarAlquiler(event)`. The function:
+
+1. Validates that at least one item is in `_itemsAlquiler`.
+2. Verifies that current stock in `localStorage` covers each item's quantity.
+3. Obtains the next consecutive document number.
+4. Builds the rental object and pushes it to the `alquileres` array in `localStorage`.
+5. Deducts the rented quantities from each product's `stock`.
+6. Calls `exportarDatos()` to sync to MongoDB Atlas.
+7. Resets the form and re-renders the active rentals table.
+8. Opens `remision_salida.html?id=<rental_id>` in a new browser tab.
+
+### Rental object structure
+
+The object saved to `localStorage` under the key `alquileres` has this shape:
+
+```javascript
+{
+  id: Date.now(),               // Unique numeric ID
+  consecutivoDoc: 1,            // Shared sequence number
+  remisionNumero: "REM00001",   // Formatted remission number
+  facturaNumero: "FVPA00001",  // Formatted invoice number
+  cliente: {
+    nombre: "...",
+    identificacion: "...",
+    telefono: "...",
+    direccion: "..."
+  },
+  items: [ /* array of rented item snapshots */ ],
+  dias: 0,                      // Starts at 0; set on return
+  garantia: 200000,             // Deposit amount in COP
+  subtotalDia: 150000,          // Daily subtotal
+  totalAlquiler: 0,             // Finalized on return
+  totalPagar: 200000,           // Initial amount = garantia
+  fechaSalida: "...",           // Locale string
+  fechaSalidaISO: "...",        // ISO 8601 for day calculations
+  fechaDevolucionEstimada: null,
+  estado: "activo",
+  fechaDevolucionReal: null,
+  fechaDevolucionRealISO: null,
+  observaciones: "...",
+  registradoPor: "username"
+}
+```
+
+## Rental history table
+
+Below the form, `cargarAlquileresActivos()` renders all rentals (active and returned) in reverse chronological order. The table includes columns for **ID**, **Cliente**, **Cédula**, **Artículos**, **Fecha Salida**, **Total**, **Estado**, and links to the **Remisión** and **Factura** documents.
+
+The **Estado** badge color indicates the current state:
+
+| Estado | Badge color |
+|---|---|
+| `activo` | Yellow (`badge-warning`) |
+| `devuelto` | Green (`badge-success`) |
+
+A **Descargar Historial CSV** button appears above the table. See [Exporting rental history](/guide/export-csv) for details.
+
+<Tip>
+  After saving a rental, the remission note opens automatically in a new tab. You can also re-open it at any time by clicking the **Remisión** link in the history table.
+</Tip>

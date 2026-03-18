@@ -1,0 +1,89 @@
+---
+title: "Editing a product"
+description: "Search for an existing inventory item and update its fields using the product edit page in Pycasas."
+---
+
+The product edit page (`productos_edicion.html`) lets you modify an existing product's details. It calls `initProductosEdicion()` on load, which verifies your session and confirms you have the `productos` permission.
+
+## Access
+
+Roles with the `productos` permission can edit products: `admin`, `gerente`, `vendedor`, and `bodeguero`. See [Roles and permissions](/guide/roles-permissions) for the full permission matrix.
+
+## Two-step workflow
+
+Editing is a two-step process: you first search for the product, then edit it.
+
+<Steps>
+  <Step title="Search for the product">
+    Type any part of the item's **código** or **nombre** into the search field (`buscar-input`). `buscarProductoEdicion()` runs on every keystroke and filters the `localStorage` product list for case-insensitive matches on either field. Results appear in a table below the search bar showing Código, Nombre, Categoría, Precio, and Stock.
+  </Step>
+  <Step title="Open the edit form">
+    Click the **Editar** button on the matching row. This calls `cargarEdicion(p)`, which populates the edit form fields and scrolls the form into view.
+  </Step>
+  <Step title="Update the fields">
+    Modify any editable field in the form. See the field reference table below for which fields can and cannot be changed.
+  </Step>
+  <Step title="Save the changes">
+    Click **Guardar Cambios**. This calls `actualizarProducto(event)`, which locates the product in the array by `id`, applies your changes, writes the updated array back to `localStorage`, and calls `exportarDatos()` to sync to MongoDB Atlas.
+  </Step>
+</Steps>
+
+## Editable fields
+
+The following fields can be changed in the edit form. They are loaded into the form by `cargarEdicion()` and saved by `actualizarProducto()`:
+
+| Field | Element ID | Type | Required | Notes |
+|---|---|---|---|---|
+| `nombre` | `edit-nombre` | text | Yes | Display name of the item |
+| `categoria` | `edit-categoria` | select | Yes | Fixed category options |
+| `precio` | `edit-precio` | number | Yes | Rental price in COP; parsed with `parseFloat` |
+| `costo` | `edit-costo` | number | No | Purchase cost in COP; parsed with `parseFloat`, defaults to `0` if empty |
+| `stock` | `edit-stock` | number | Yes | Current available quantity; parsed with `parseInt` |
+| `stockMin` | `edit-stock-min` | number | No | Minimum stock threshold; parsed with `parseInt`, defaults to `0` if empty |
+| `proveedor` | `edit-proveedor` | text | No | Supplier name |
+| `descripcion` | `edit-descripcion` | textarea | No | Free-text description |
+
+## Fields that cannot be changed
+
+The following fields are set when the product is first created and are immutable:
+
+| Field | Element ID | Reason |
+|---|---|---|
+| `id` | `edit-id` (hidden) | Internal identifier used to locate the record |
+| `codigo` | `edit-codigo` | Unique SKU; rendered as read-only (`input-readonly`) |
+| `fechaIngreso` | — | Creation date; preserved via object spread in `actualizarProducto` |
+| `creadoPor` | — | Original author; preserved via object spread in `actualizarProducto` |
+
+<Note>
+  The `edit-codigo` field is visually rendered in the form with a `readonly` attribute so you can see the code for reference. It cannot be typed into or changed.
+</Note>
+
+## Audit fields added on save
+
+Each successful save adds two additional fields to the product record:
+
+| Field | Value |
+|---|---|
+| `ultimaEdicion` | `new Date().toLocaleDateString("es-CO")` — the current date |
+| `editadoPor` | `sesion.username` — the username of the editor |
+
+These fields are appended alongside the updated values using an object spread (`{ ...productos[idx], ... }`) so all original fields are preserved.
+
+## Cancelling an edit
+
+Click **Cancelar** to call `cancelarEdicion()`. This:
+
+1. Hides the edit form section (`seccion-edicion`).
+2. Clears the search input (`buscar-input`).
+3. Empties the results table (`tabla-busqueda`).
+
+No changes are saved when you cancel.
+
+## After saving
+
+On success:
+
+1. A success banner displays `Producto "<nombre>" actualizado correctamente.`
+2. `exportarDatos()` pushes all `localStorage` data to MongoDB Atlas.
+3. `cancelarEdicion()` is called to reset the search and hide the form.
+4. The page scrolls back to the top.

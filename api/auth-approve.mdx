@@ -1,0 +1,177 @@
+---
+title: 'Approve user'
+description: 'Approve a pending user account by token (email link) or by MongoDB ObjectId (admin UI).'
+---
+
+There are two endpoints for approving a user account. Both set `activo: true`, `aprobado: true`, record `fechaAprobacion`, remove the approval and rejection tokens, and send an email notification to the user.
+
+| Endpoint | Trigger | Response format |
+|---|---|---|
+| `GET /api/aprobar-usuario` | Email link | HTML page |
+| `POST /api/aprobar-usuario-id/:id` | Admin UI | JSON |
+
+---
+
+## GET /api/aprobar-usuario
+
+Token-based approval. The link is sent to `tecnico@pycasas.co` when a user registers. Clicking it opens this endpoint in a browser.
+
+### Query parameters
+
+<ParamField query="token" type="string" required>
+  The `tokenAprobacion` value stored on the user record. Generated as a 20-byte random hex string at registration.
+</ParamField>
+
+### Behavior
+
+1. Looks up the user by `tokenAprobacion`.
+2. Sets `activo: true`, `aprobado: true`, `fechaAprobacion: new Date()`.
+3. Removes `tokenAprobacion` and `tokenRechazo` from the document.
+4. Sends an approval email to the user's registered email address.
+5. Returns an HTML confirmation page.
+
+### Responses
+
+**Success** — Returns an HTML page confirming approval.
+
+**Invalid or already-used token** — Returns the HTML string:
+
+```html
+<h1>Token inválido o usuario ya aprobado.</h1>
+```
+
+**Missing token** — Returns the HTML string:
+
+```html
+<h1>Token inválido</h1>
+```
+
+### Example
+
+```bash
+curl "https://your-domain.com/api/aprobar-usuario?token=a3f2c1d4e5b6789012345678901234567890abcd"
+```
+
+---
+
+## POST /api/aprobar-usuario-id/:id
+
+ID-based approval. Used by the admin UI to approve accounts by MongoDB `ObjectId`.
+
+### Path parameters
+
+<ParamField path="id" type="string" required>
+  The MongoDB `ObjectId` of the user document (24-character hex string).
+</ParamField>
+
+### Behavior
+
+1. Looks up the user by `ObjectId`.
+2. Sets `activo: true`, `aprobado: true`, `fechaAprobacion: new Date()`.
+3. Removes `tokenAprobacion` and `tokenRechazo` from the document.
+4. Sends an approval email to the user's registered email address.
+5. Returns JSON.
+
+### Response fields
+
+**200 — Approved**
+
+<ResponseField name="ok" type="boolean">
+  `true` when the user was approved successfully.
+</ResponseField>
+
+<ResponseField name="msg" type="string">
+  `"Usuario aprobado"`.
+</ResponseField>
+
+**404 — Not found**
+
+<ResponseField name="error" type="string">
+  `"Usuario no encontrado"` — no user exists with the provided ObjectId.
+</ResponseField>
+
+**500 — Server error**
+
+<ResponseField name="error" type="string">
+  Error message from the server or MongoDB driver.
+</ResponseField>
+
+### Example
+
+```bash
+curl -X POST https://your-domain.com/api/aprobar-usuario-id/64f1a2b3c4d5e6f7a8b9c0d1
+```
+
+**200 response**
+
+```json
+{
+  "ok": true,
+  "msg": "Usuario aprobado"
+}
+```
+
+---
+
+## GET /api/usuarios-pendientes
+
+Returns all user accounts with `activo: false` (pending approval). Tokens are stripped from the response.
+
+### Query parameters
+
+None.
+
+### Response fields
+
+**200 — OK**
+
+Returns a JSON array of pending user objects.
+
+<ResponseField name="_id" type="string">
+  MongoDB ObjectId of the user document.
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  User's full name.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address.
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  User's username.
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  Requested role.
+</ResponseField>
+
+<ResponseField name="fechaRegistro" type="string">
+  ISO 8601 date when the account was created.
+</ResponseField>
+
+<Note>
+  `tokenAprobacion` and `tokenRechazo` are intentionally excluded from this response.
+</Note>
+
+### Example
+
+```bash
+curl https://your-domain.com/api/usuarios-pendientes
+```
+
+**200 response**
+
+```json
+[
+  {
+    "_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+    "nombre": "María García",
+    "email": "maria@example.com",
+    "username": "maria.garcia",
+    "role": "vendedor",
+    "fechaRegistro": "2024-01-15T10:30:00.000Z"
+  }
+]
+```

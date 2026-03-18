@@ -1,0 +1,105 @@
+---
+title: 'List products'
+description: 'Retrieve all products from the inventory collection.'
+---
+
+`GET /api/productos`
+
+Returns all documents from the `productos` collection. Use the `test` query parameter to target the test database.
+
+## Query parameters
+
+<ParamField query="test" type="string">
+  When set to `"true"`, reads from the `pycasas_test` database. Omit or set to any other value to read from `pycasas`.
+</ParamField>
+
+## Response fields
+
+### 200 — OK
+
+Returns a JSON array of product objects.
+
+<ResponseField name="id" type="number">
+  Unique numeric identifier (Unix timestamp at creation time).
+</ResponseField>
+
+<ResponseField name="codigo" type="string">
+  Product code (must be unique within the collection).
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  Product name.
+</ResponseField>
+
+<ResponseField name="categoria" type="string">
+  Product category.
+</ResponseField>
+
+<ResponseField name="precio" type="number">
+  Rental price per unit.
+</ResponseField>
+
+<ResponseField name="costo" type="number">
+  Cost per unit. Defaults to `0` if not provided.
+</ResponseField>
+
+<ResponseField name="stock" type="number">
+  Current available stock quantity.
+</ResponseField>
+
+<ResponseField name="stockMin" type="number">
+  Minimum stock threshold for alerts. Defaults to `0`.
+</ResponseField>
+
+<ResponseField name="proveedor" type="string">
+  Supplier name.
+</ResponseField>
+
+<ResponseField name="descripcion" type="string">
+  Product description.
+</ResponseField>
+
+<ResponseField name="fechaIngreso" type="string">
+  Date the product was added, formatted as a locale string (e.g. `"15/1/2024"`).
+</ResponseField>
+
+<ResponseField name="creadoPor" type="string">
+  Username of the user who created the product.
+</ResponseField>
+
+### 500 — Server error
+
+<ResponseField name="error" type="string">
+  Error message from the server or MongoDB driver.
+</ResponseField>
+
+## Example
+
+```bash
+# Production database
+curl https://your-domain.com/api/productos
+
+# Test database
+curl https://your-domain.com/api/productos?test=true
+```
+
+**200 response**
+
+```json
+[
+  {
+    "id": 1705312200000,
+    "codigo": "SIL-001",
+    "nombre": "Silla plegable",
+    "categoria": "Mobiliario",
+    "precio": 5000,
+    "costo": 2000,
+    "stock": 50,
+    "stockMin": 5,
+    "proveedor": "Proveedor ABC",
+    "descripcion": "Silla plástica plegable para eventos",
+    "fechaIngreso": "15/1/2024",
+    "creadoPor": "admin"
+  }
+]
+```
