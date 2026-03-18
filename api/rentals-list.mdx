@@ -28,11 +28,11 @@ Returns a JSON array of rental objects.
 </ResponseField>
 
 <ResponseField name="remisionNumero" type="string">
-  Formatted remission document number (e.g. `"REM-0001"`).
+  Formatted remission document number (e.g. `"REM00001"`). Format: `"REM"` + 5-digit zero-padded consecutive number.
 </ResponseField>
 
 <ResponseField name="facturaNumero" type="string">
-  Formatted invoice number (e.g. `"FAC-0001"`).
+  Formatted invoice number (e.g. `"FVPA00001"`). Format: `"FVPA"` + 5-digit zero-padded consecutive number.
 </ResponseField>
 
 <ResponseField name="cliente" type="object">
@@ -86,7 +86,7 @@ Returns a JSON array of rental objects.
 </ResponseField>
 
 <ResponseField name="estado" type="string">
-  Rental status. `"activo"` when items are out; updated to another value on return.
+  Rental status. `"activo"` when items are out; set to `"devuelto"` when the return is confirmed.
 </ResponseField>
 
 <ResponseField name="fechaDevolucionReal" type="string | null">
@@ -128,8 +128,8 @@ curl https://your-domain.com/api/alquileres?test=true
   {
     "id": 1705312200000,
     "consecutivoDoc": 1,
-    "remisionNumero": "REM-0001",
-    "facturaNumero": "FAC-0001",
+    "remisionNumero": "REM00001",
+    "facturaNumero": "FVPA00001",
     "cliente": {
       "nombre": "Juan Pérez",
       "identificacion": "123456789",

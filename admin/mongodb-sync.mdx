@@ -41,9 +41,13 @@ Content-Type: application/json
 {
   "productos": [ /* array from localStorage */ ],
   "alquileres": [ /* array from localStorage */ ],
-  "isTest": false
+  "test": false
 }
 ```
+
+<Note>
+  The frontend sends the field as `test`, but the server reads `isTest` from the body. Because the names don't match, the server always defaults `isTest` to `false` and writes to the `pycasas` production database regardless of session mode. The test-mode database isolation for sync applies correctly to the **pull** direction (`GET /api/productos?test=true`) but not to the push direction via `exportarDatos()`.
+</Note>
 
 On the server, `POST /api/exportar` **replaces the collections entirely**. It calls `deleteMany({})` then `insertMany(documents)` for both `productos` and `alquileres`. This is not an incremental update — the entire dataset is overwritten each time.
 
